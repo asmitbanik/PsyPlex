@@ -1,20 +1,14 @@
-
 import { Link } from "react-router-dom";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-
-// Mock client data
-const clients = [
-  { id: "1", name: "Sarah Johnson", age: 34, sessions: 12, lastSession: "May 4, 2025", status: "Active" },
-  { id: "2", name: "Michael Chen", age: 28, sessions: 8, lastSession: "April 28, 2025", status: "Active" },
-  { id: "3", name: "Emily Rodriguez", age: 42, sessions: 15, lastSession: "May 5, 2025", status: "Active" },
-  { id: "4", name: "James Wilson", age: 31, sessions: 5, lastSession: "April 20, 2025", status: "On Hold" },
-  { id: "5", name: "Emma Davis", age: 26, sessions: 3, lastSession: "May 2, 2025", status: "New" }
-];
+import clientsData from "@/data/clientsData.json";
 
 const Clients = () => {
+  // Use data from JSON file
+  const { clients } = clientsData;
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col md:flex-row gap-4 justify-between items-start md:items-center">

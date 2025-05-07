@@ -1,19 +1,13 @@
-
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import sessionsData from "@/data/sessionsData.json";
 
 // Mock session data
-const sessions = [
-  { id: "1", clientName: "Sarah Johnson", clientId: "1", date: "May 7, 2025", time: "2:00 PM", type: "In-person", status: "Today" },
-  { id: "2", clientName: "James Wilson", clientId: "4", date: "May 8, 2025", time: "10:00 AM", type: "Virtual", status: "Upcoming" },
-  { id: "3", clientName: "Emma Davis", clientId: "5", date: "May 10, 2025", time: "3:30 PM", type: "In-person", status: "Upcoming" },
-  { id: "4", clientName: "Michael Chen", clientId: "2", date: "May 4, 2025", time: "10:00 AM", type: "Virtual", status: "Completed" },
-  { id: "5", clientName: "Emily Rodriguez", clientId: "3", date: "May 5, 2025", time: "1:00 PM", type: "In-person", status: "Completed" }
-];
+const { sessions } = sessionsData;
 
 const Sessions = () => {
   return (

@@ -1,23 +1,13 @@
-
 import { Link } from "react-router-dom";
 import { Users, CalendarCheck, BrainCircuit, LineChart, FileText } from "lucide-react";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
+import dashboardData from "@/data/dashboardData.json";
 
 const Dashboard = () => {
-  // Mock data
-  const recentClients = [
-    { id: '1', name: 'Sarah Johnson', lastSession: '2 days ago', progress: 75 },
-    { id: '2', name: 'Michael Chen', lastSession: '1 week ago', progress: 60 },
-    { id: '3', name: 'Emily Rodriguez', lastSession: 'Yesterday', progress: 85 },
-  ];
-
-  const upcomingSessions = [
-    { id: '1', clientName: 'Sarah Johnson', date: 'Today', time: '2:00 PM', type: 'In-person' },
-    { id: '2', clientName: 'James Wilson', date: 'Tomorrow', time: '10:00 AM', type: 'Virtual' },
-    { id: '3', clientName: 'Emma Davis', date: 'May 10, 2025', time: '3:30 PM', type: 'In-person' },
-  ];
+  // Use data from JSON file
+  const { recentClients, upcomingSessions } = dashboardData;
 
   return (
     <div className="space-y-6">

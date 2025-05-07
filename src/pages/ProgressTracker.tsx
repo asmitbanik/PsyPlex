@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { 
   LineChart, 
@@ -15,7 +14,7 @@ import {
   PolarGrid, 
   PolarAngleAxis, 
   Radar,
-  PieChart,
+  PieChart as RechartsPortalPieChart,
   Pie,
   Cell
 } from "recharts";
@@ -31,6 +30,8 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
+import progressTrackerData from "@/data/progressTrackerData.json";
+import { generateProgressChartData, calculateProgressMetrics } from "@/utils/chartDataGenerator";
 
 // Mock data for the progress chart
 const generateMockData = () => {
@@ -43,31 +44,12 @@ const generateMockData = () => {
   }));
 };
 
-const skillsData = [
-  { subject: 'Emotion Regulation', A: 65, fullMark: 100 },
-  { subject: 'Distress Tolerance', A: 70, fullMark: 100 },
-  { subject: 'Mindfulness', A: 80, fullMark: 100 },
-  { subject: 'Interpersonal Skills', A: 55, fullMark: 100 },
-  { subject: 'Self-Awareness', A: 75, fullMark: 100 },
-];
-
-const attendanceData = [
-  { name: 'Attended', value: 11 },
-  { name: 'Canceled', value: 1 },
-  { name: 'No-Show', value: 0 },
-];
-
-const clientsList = [
-  { id: "1", name: "Sarah Johnson" },
-  { id: "2", name: "Michael Chen" },
-  { id: "3", name: "Emily Rodriguez" },
-  { id: "4", name: "James Wilson" },
-  { id: "5", name: "Emma Davis" },
-];
-
 const ProgressTracker = () => {
+  // Use data from JSON file
+  const { clientsList, attendanceData, skillsData, treatmentGoals, therapistNotes } = progressTrackerData;
+  
   const [selectedClient, setSelectedClient] = useState(clientsList[0].id);
-  const [chartData] = useState(generateMockData);
+  const [chartData] = useState(generateProgressChartData);
   const [selectedMeasure, setSelectedMeasure] = useState("anxiety");
   const [chartView, setChartView] = useState("line");
 
@@ -75,17 +57,7 @@ const ProgressTracker = () => {
   const client = clientsList.find(c => c.id === selectedClient);
 
   // Calculate progress metrics
-  const initialValue = chartData[0][selectedMeasure];
-  const currentValue = chartData[chartData.length - 1][selectedMeasure];
-  const changePercentage = Math.round(((initialValue - currentValue) / initialValue) * 100);
-  
-  // For wellbeing, we want to show improvement as a positive percentage
-  const displayPercentage = selectedMeasure === "wellbeing" ? 
-    Math.abs(Math.round(((currentValue - initialValue) / initialValue) * 100)) :
-    Math.abs(changePercentage);
-  
-  const isImprovement = (selectedMeasure === "wellbeing" && currentValue > initialValue) || 
-                        (selectedMeasure !== "wellbeing" && currentValue < initialValue);
+  const { currentValue, displayPercentage, isImprovement } = calculateProgressMetrics(chartData, selectedMeasure);
 
   return (
     <div className="space-y-6">
@@ -233,7 +205,7 @@ const ProgressTracker = () => {
             <CardContent className="pt-2">
               <div className="h-[180px]">
                 <ResponsiveContainer width="100%" height="100%">
-                  <PieChart>
+                  <RechartsPortalPieChart>
                     <Tooltip />
                     <Pie
                       data={attendanceData}
@@ -252,7 +224,7 @@ const ProgressTracker = () => {
                       })}
                     </Pie>
                     <Legend />
-                  </PieChart>
+                  </RechartsPortalPieChart>
                 </ResponsiveContainer>
               </div>
             </CardContent>
@@ -420,34 +392,20 @@ const ProgressTracker = () => {
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
-              <div className="space-y-2">
-                <div className="flex justify-between text-sm">
-                  <span className="font-medium">Reduce anxiety in social situations</span>
-                  <span className="text-green-600 font-medium">75% Complete</span>
+              {treatmentGoals.map((goal, index) => (
+                <div key={index} className="space-y-2">
+                  <div className="flex justify-between text-sm">
+                    <span className="font-medium">{goal.name}</span>
+                    <span className={`font-medium ${
+                      goal.progress >= 60 ? "text-green-600" : 
+                      goal.progress >= 40 ? "text-amber-600" : "text-amber-600"
+                    }`}>
+                      {goal.progress}% Complete
+                    </span>
+                  </div>
+                  <Progress value={goal.progress} className="h-2" indicatorClassName="bg-therapy-purple" />
                 </div>
-                <Progress value={75} className="h-2" indicatorClassName="bg-therapy-purple" />
-              </div>
-              <div className="space-y-2">
-                <div className="flex justify-between text-sm">
-                  <span className="font-medium">Develop healthy coping strategies</span>
-                  <span className="text-green-600 font-medium">60% Complete</span>
-                </div>
-                <Progress value={60} className="h-2" indicatorClassName="bg-therapy-purple" />
-              </div>
-              <div className="space-y-2">
-                <div className="flex justify-between text-sm">
-                  <span className="font-medium">Improve work-life balance</span>
-                  <span className="text-green-600 font-medium">40% Complete</span>
-                </div>
-                <Progress value={40} className="h-2" indicatorClassName="bg-therapy-purple" />
-              </div>
-              <div className="space-y-2">
-                <div className="flex justify-between text-sm">
-                  <span className="font-medium">Build confidence in professional settings</span>
-                  <span className="text-amber-600 font-medium">25% Complete</span>
-                </div>
-                <Progress value={25} className="h-2" indicatorClassName="bg-therapy-purple" />
-              </div>
+              ))}
             </div>
           </CardContent>
         </Card>
@@ -461,22 +419,12 @@ const ProgressTracker = () => {
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
-              <div className="p-3 border rounded-md">
-                <p className="text-sm text-gray-500">Session 8 - May 1, 2025</p>
-                <p className="mt-1">
-                  Client continues to make good progress with anxiety management techniques. 
-                  Reported using deep breathing exercises effectively during a stressful work presentation. 
-                  Still experiencing some avoidance behaviors in certain social settings.
-                </p>
-              </div>
-              <div className="p-3 border rounded-md">
-                <p className="text-sm text-gray-500">Session 6 - April 17, 2025</p>
-                <p className="mt-1">
-                  Significant breakthrough today in identifying core beliefs related to perfectionism. 
-                  Client showed good insight into how these beliefs affect work performance and relationships. 
-                  Homework compliance has improved.
-                </p>
-              </div>
+              {therapistNotes.map((note, index) => (
+                <div key={index} className="p-3 border rounded-md">
+                  <p className="text-sm text-gray-500">{note.date}</p>
+                  <p className="mt-1">{note.content}</p>
+                </div>
+              ))}
               <Button variant="outline" size="sm" className="mt-2 w-full">
                 View All Session Notes
               </Button>

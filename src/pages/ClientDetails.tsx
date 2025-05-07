@@ -1,55 +1,13 @@
-
 import { useParams, Link } from "react-router-dom";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { ArrowLeft, FileText, CalendarCheck } from "lucide-react";
-
-// Mock client data
-const clientsData = {
-  "1": {
-    id: "1",
-    name: "Sarah Johnson",
-    email: "sarah.j@example.com",
-    phone: "+1 (555) 123-4567",
-    dob: "April 15, 1991",
-    address: "123 Main St, Anytown, CA 94321",
-    occupation: "Marketing Manager",
-    emergencyContact: "John Johnson (Husband) - +1 (555) 987-6543",
-    startDate: "January 10, 2025",
-    therapyType: "Cognitive Behavioral Therapy",
-    primaryConcerns: "Anxiety, Work-related stress",
-    notes: "Sarah has been making good progress with anxiety management techniques. She reports feeling more in control during stressful work situations.",
-    sessions: [
-      { id: "s1", date: "May 4, 2025", time: "2:00 PM", type: "In-person", status: "Completed", notes: "Discussed workplace anxiety triggers and practiced mindfulness exercises." },
-      { id: "s2", date: "April 20, 2025", time: "2:00 PM", type: "In-person", status: "Completed", notes: "Reviewed thought records and identified cognitive distortions." },
-      { id: "s3", date: "April 6, 2025", time: "2:30 PM", type: "Virtual", status: "Completed", notes: "Introduced exposure hierarchy for social anxiety." }
-    ]
-  },
-  "2": {
-    id: "2",
-    name: "Michael Chen",
-    email: "michael.c@example.com",
-    phone: "+1 (555) 234-5678",
-    dob: "June 22, 1997",
-    address: "456 Oak Ave, Somewhere, CA 94123",
-    occupation: "Software Engineer",
-    emergencyContact: "Lisa Chen (Sister) - +1 (555) 876-5432",
-    startDate: "February 15, 2025",
-    therapyType: "Dialectical Behavior Therapy",
-    primaryConcerns: "Depression, Relationship issues",
-    notes: "Michael is working on emotional regulation skills and has shown improvement in interpersonal relationships.",
-    sessions: [
-      { id: "s1", date: "April 28, 2025", time: "10:00 AM", type: "Virtual", status: "Completed", notes: "Practiced interpersonal effectiveness skills for workplace conflicts." },
-      { id: "s2", date: "April 14, 2025", time: "10:00 AM", type: "In-person", status: "Completed", notes: "Reviewed emotion regulation diary and identified triggers." },
-      { id: "s3", date: "March 31, 2025", time: "10:00 AM", type: "Virtual", status: "Completed", notes: "Discussed mindfulness practices and their application to daily life." }
-    ]
-  }
-};
+import clientsData from "@/data/clientsData.json";
 
 const ClientDetails = () => {
   const { clientId } = useParams<{ clientId: string }>();
-  const client = clientId ? clientsData[clientId] : undefined;
+  const client = clientId ? clientsData.clientDetails[clientId] : undefined;
 
   if (!client) {
     return (

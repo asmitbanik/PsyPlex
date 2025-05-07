@@ -1,0 +1,32 @@
+
+{
+  "clientsList": [
+    { "id": "1", "name": "Sarah Johnson" },
+    { "id": "2", "name": "Michael Chen" },
+    { "id": "3", "name": "Emily Rodriguez" },
+    { "id": "4", "name": "James Wilson" },
+    { "id": "5", "name": "Emma Davis" }
+  ],
+  "attendanceData": [
+    { "name": "Attended", "value": 11 },
+    { "name": "Canceled", "value": 1 },
+    { "name": "No-Show", "value": 0 }
+  ],
+  "skillsData": [
+    { "subject": "Emotion Regulation", "A": 65, "fullMark": 100 },
+    { "subject": "Distress Tolerance", "A": 70, "fullMark": 100 },
+    { "subject": "Mindfulness", "A": 80, "fullMark": 100 },
+    { "subject": "Interpersonal Skills", "A": 55, "fullMark": 100 },
+    { "subject": "Self-Awareness", "A": 75, "fullMark": 100 }
+  ],
+  "treatmentGoals": [
+    { "name": "Reduce anxiety in social situations", "progress": 75 },
+    { "name": "Develop healthy coping strategies", "progress": 60 },
+    { "name": "Improve work-life balance", "progress": 40 },
+    { "name": "Build confidence in professional settings", "progress": 25 }
+  ],
+  "therapistNotes": [
+    { "date": "Session 8 - May 1, 2025", "content": "Client continues to make good progress with anxiety management techniques. Reported using deep breathing exercises effectively during a stressful work presentation. Still experiencing some avoidance behaviors in certain social settings." },
+    { "date": "Session 6 - April 17, 2025", "content": "Significant breakthrough today in identifying core beliefs related to perfectionism. Client showed good insight into how these beliefs affect work performance and relationships. Homework compliance has improved." }
+  ]
+}
