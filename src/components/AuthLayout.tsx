@@ -11,7 +11,7 @@ const isAuthenticated = () => {
 
 const AuthLayout = () => {
   if (!isAuthenticated()) {
-    return <Navigate to="/login" replace />;
+    return <Navigate to = "/login" replace />;
   }
   
   return <Outlet />;

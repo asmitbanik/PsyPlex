@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -7,7 +6,8 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "@/hooks/use-toast";
 import AudioUploader from "@/components/AudioUploader";
-import { FileText, AudioWaveform } from "lucide-react";
+import LiveRecorder from "@/components/LiveRecorder";
+import { FileText, AudioWaveform, Mic } from "lucide-react";
 
 interface InsightCardProps {
   title: string;
@@ -32,7 +32,7 @@ const TherapyInsights = () => {
   const [sessionNotes, setSessionNotes] = useState("");
   const [isGenerating, setIsGenerating] = useState(false);
   const [insightsGenerated, setInsightsGenerated] = useState(false);
-  const [inputMethod, setInputMethod] = useState<"text" | "audio">("text");
+  const [inputMethod, setInputMethod] = useState<"text" | "audio" | "live">("live");
 
   const handleGenerateInsights = () => {
     if (!sessionNotes.trim()) return;
@@ -65,7 +65,7 @@ const TherapyInsights = () => {
         <CardHeader>
           <CardTitle>Session Analysis</CardTitle>
           <CardDescription>
-            Enter session notes or upload audio to generate insights
+            Enter session notes or record/upload audio to generate insights
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -101,6 +101,15 @@ const TherapyInsights = () => {
                   Text Input
                 </Button>
                 <Button 
+                  variant={inputMethod === "live" ? "default" : "outline"} 
+                  size="sm"
+                  onClick={() => setInputMethod("live")}
+                  className={inputMethod === "live" ? "bg-therapy-purple hover:bg-therapy-purpleDeep" : ""}
+                >
+                  <Mic className="mr-2 h-4 w-4" />
+                  Live Recording
+                </Button>
+                <Button 
                   variant={inputMethod === "audio" ? "default" : "outline"} 
                   size="sm"
                   onClick={() => setInputMethod("audio")}
@@ -120,11 +129,13 @@ const TherapyInsights = () => {
                 value={sessionNotes}
                 onChange={(e) => setSessionNotes(e.target.value)}
               />
+            ) : inputMethod === "live" ? (
+              <LiveRecorder onTranscriptionComplete={handleTranscriptionComplete} />
             ) : (
               <AudioUploader onTranscriptionComplete={handleTranscriptionComplete} />
             )}
             
-            {inputMethod === "audio" && sessionNotes && (
+            {(inputMethod === "audio" || inputMethod === "live") && sessionNotes && (
               <div className="mt-4">
                 <h3 className="text-sm font-medium mb-2">Transcription:</h3>
                 <div className="p-3 bg-muted rounded-md">
