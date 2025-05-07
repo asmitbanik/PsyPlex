@@ -1,12 +1,30 @@
 
 import { useState } from "react";
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, BarChart, Bar, RadarChart, PolarGrid, PolarAngleAxis, Radar } from "recharts";
+import { 
+  LineChart, 
+  Line, 
+  XAxis, 
+  YAxis, 
+  CartesianGrid, 
+  Tooltip, 
+  Legend, 
+  ResponsiveContainer, 
+  BarChart, 
+  Bar, 
+  RadarChart, 
+  PolarGrid, 
+  PolarAngleAxis, 
+  Radar,
+  Pie,
+  Cell,
+  PieChart
+} from "recharts";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Progress } from "@/components/ui/progress";
-import { FileDown, Calendar, ChevronDown, Download, ArrowUp, ArrowDown, Badge, PieChart, CalendarDays } from "lucide-react";
+import { FileDown, Calendar, ChevronDown, Download, ArrowUp, ArrowDown, Badge, PieChart as PieChartIcon, CalendarDays } from "lucide-react";
 import ProgressMetricCard from "@/components/ProgressMetricCard";
 import { 
   Popover,
