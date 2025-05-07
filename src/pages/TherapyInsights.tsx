@@ -1,10 +1,12 @@
-
 import { useState } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
+import { toast } from "@/components/ui/use-toast";
+import AudioUploader from "@/components/AudioUploader";
+import { FileText, AudioWaveform } from "lucide-react";
 
 interface InsightCardProps {
   title: string;
@@ -29,6 +31,7 @@ const TherapyInsights = () => {
   const [sessionNotes, setSessionNotes] = useState("");
   const [isGenerating, setIsGenerating] = useState(false);
   const [insightsGenerated, setInsightsGenerated] = useState(false);
+  const [inputMethod, setInputMethod] = useState<"text" | "audio">("text");
 
   const handleGenerateInsights = () => {
     if (!sessionNotes.trim()) return;
@@ -39,7 +42,15 @@ const TherapyInsights = () => {
     setTimeout(() => {
       setIsGenerating(false);
       setInsightsGenerated(true);
+      toast({
+        title: "Insights Generated",
+        description: "AI analysis complete based on your session notes."
+      });
     }, 2000);
+  };
+
+  const handleTranscriptionComplete = (transcription: string) => {
+    setSessionNotes(transcription);
   };
 
   return (
@@ -53,7 +64,7 @@ const TherapyInsights = () => {
         <CardHeader>
           <CardTitle>Session Analysis</CardTitle>
           <CardDescription>
-            Enter session notes and select a therapy type to generate insights
+            Enter session notes or upload audio to generate insights
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -76,16 +87,50 @@ const TherapyInsights = () => {
           </div>
           
           <div className="space-y-2">
-            <label htmlFor="session-notes" className="text-sm font-medium">
-              Session Notes
-            </label>
-            <Textarea
-              id="session-notes"
-              placeholder="Enter your session notes here..."
-              className="h-40"
-              value={sessionNotes}
-              onChange={(e) => setSessionNotes(e.target.value)}
-            />
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-2">
+              <label className="text-sm font-medium">Input Method</label>
+              <div className="flex space-x-2 mt-1 sm:mt-0">
+                <Button 
+                  variant={inputMethod === "text" ? "default" : "outline"} 
+                  size="sm"
+                  onClick={() => setInputMethod("text")}
+                  className={inputMethod === "text" ? "bg-therapy-purple hover:bg-therapy-purpleDeep" : ""}
+                >
+                  <FileText className="mr-2 h-4 w-4" />
+                  Text Input
+                </Button>
+                <Button 
+                  variant={inputMethod === "audio" ? "default" : "outline"} 
+                  size="sm"
+                  onClick={() => setInputMethod("audio")}
+                  className={inputMethod === "audio" ? "bg-therapy-purple hover:bg-therapy-purpleDeep" : ""}
+                >
+                  <AudioWaveform className="mr-2 h-4 w-4" />
+                  Audio Upload
+                </Button>
+              </div>
+            </div>
+
+            {inputMethod === "text" ? (
+              <Textarea
+                id="session-notes"
+                placeholder="Enter your session notes here..."
+                className="h-40"
+                value={sessionNotes}
+                onChange={(e) => setSessionNotes(e.target.value)}
+              />
+            ) : (
+              <AudioUploader onTranscriptionComplete={handleTranscriptionComplete} />
+            )}
+            
+            {inputMethod === "audio" && sessionNotes && (
+              <div className="mt-4">
+                <h3 className="text-sm font-medium mb-2">Transcription:</h3>
+                <div className="p-3 bg-muted rounded-md">
+                  <p className="text-sm">{sessionNotes}</p>
+                </div>
+              </div>
+            )}
           </div>
           
           <div className="flex justify-end">

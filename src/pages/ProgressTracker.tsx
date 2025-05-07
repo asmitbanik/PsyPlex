@@ -1,11 +1,18 @@
 
 import { useState } from "react";
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, BarChart, Bar, RadarChart, PolarGrid, PolarAngleAxis, Radar } from "recharts";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { FileDown } from "lucide-react";
+import { Progress } from "@/components/ui/progress";
+import { FileDown, Calendar, ChevronDown, Download, ArrowUp, ArrowDown, Badge, PieChart, CalendarDays } from "lucide-react";
+import ProgressMetricCard from "@/components/ProgressMetricCard";
+import { 
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 
 // Mock data for the progress chart
 const generateMockData = () => {
@@ -17,6 +24,20 @@ const generateMockData = () => {
     wellbeing: Math.floor(Math.random() * 20) + 40 + session * 4, // Increasing trend
   }));
 };
+
+const skillsData = [
+  { subject: 'Emotion Regulation', A: 65, fullMark: 100 },
+  { subject: 'Distress Tolerance', A: 70, fullMark: 100 },
+  { subject: 'Mindfulness', A: 80, fullMark: 100 },
+  { subject: 'Interpersonal Skills', A: 55, fullMark: 100 },
+  { subject: 'Self-Awareness', A: 75, fullMark: 100 },
+];
+
+const attendanceData = [
+  { name: 'Attended', value: 11 },
+  { name: 'Canceled', value: 1 },
+  { name: 'No-Show', value: 0 },
+];
 
 const clientsList = [
   { id: "1", name: "Sarah Johnson" },
@@ -30,6 +51,7 @@ const ProgressTracker = () => {
   const [selectedClient, setSelectedClient] = useState(clientsList[0].id);
   const [chartData] = useState(generateMockData);
   const [selectedMeasure, setSelectedMeasure] = useState("anxiety");
+  const [chartView, setChartView] = useState("line");
 
   // Find the selected client
   const client = clientsList.find(c => c.id === selectedClient);
@@ -54,9 +76,80 @@ const ProgressTracker = () => {
           <h1 className="text-3xl font-bold text-therapy-gray">Client Progress Tracker</h1>
           <p className="text-gray-600">Monitor and analyze client improvement over time</p>
         </div>
-        <Button className="bg-therapy-purple hover:bg-therapy-purpleDeep">
-          <FileDown className="mr-2 h-4 w-4" /> Export Report
-        </Button>
+        <div className="flex flex-wrap gap-2">
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button variant="outline" className="flex items-center gap-1">
+                <Calendar className="h-4 w-4" />
+                Last 3 Months
+                <ChevronDown className="h-4 w-4 opacity-50" />
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-48" align="end">
+              <div className="grid gap-2">
+                <Button variant="ghost" className="justify-start font-normal">Last Month</Button>
+                <Button variant="ghost" className="justify-start font-normal">Last 3 Months</Button>
+                <Button variant="ghost" className="justify-start font-normal">Last 6 Months</Button>
+                <Button variant="ghost" className="justify-start font-normal">Last Year</Button>
+                <Button variant="ghost" className="justify-start font-normal">All Time</Button>
+              </div>
+            </PopoverContent>
+          </Popover>
+
+          <Button className="bg-therapy-purple hover:bg-therapy-purpleDeep">
+            <FileDown className="mr-2 h-4 w-4" /> Export Report
+          </Button>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <ProgressMetricCard
+          title="Anxiety Levels"
+          value={`${currentValue}`}
+          subtitle="Scale: 0-100 (lower is better)"
+          change={{
+            value: displayPercentage,
+            positive: selectedMeasure === "anxiety" ? isImprovement : !isImprovement
+          }}
+          progressValue={100 - currentValue}
+          progressColor="bg-green-500"
+          icon={<ArrowDown className="h-4 w-4 text-green-500" />}
+        />
+        
+        <ProgressMetricCard
+          title="Depression Score"
+          value={chartData[chartData.length - 1].depression}
+          subtitle="Scale: 0-100 (lower is better)"
+          change={{
+            value: 18,
+            positive: true
+          }}
+          progressValue={100 - chartData[chartData.length - 1].depression}
+          progressColor="bg-blue-500"
+          icon={<ArrowDown className="h-4 w-4 text-blue-500" />}
+        />
+        
+        <ProgressMetricCard
+          title="Wellbeing Index"
+          value={chartData[chartData.length - 1].wellbeing}
+          subtitle="Scale: 0-100 (higher is better)"
+          change={{
+            value: 32,
+            positive: true
+          }}
+          progressValue={chartData[chartData.length - 1].wellbeing}
+          progressColor="bg-therapy-purple"
+          icon={<ArrowUp className="h-4 w-4 text-therapy-purple" />}
+        />
+        
+        <ProgressMetricCard
+          title="Session Attendance"
+          value="92%"
+          subtitle="11 of 12 sessions attended"
+          progressValue={92}
+          progressColor="bg-amber-500"
+          icon={<Badge className="h-4 w-4 text-amber-500" />}
+        />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
@@ -101,9 +194,51 @@ const ProgressTracker = () => {
                   <p className="text-sm text-gray-500">Current Treatment</p>
                   <p className="font-medium">Cognitive Behavioral Therapy</p>
                 </div>
+                <div>
+                  <p className="text-sm text-gray-500">Next Session</p>
+                  <p className="font-medium">May 14, 2025</p>
+                </div>
               </CardContent>
+              <CardFooter>
+                <Button variant="outline" className="w-full" size="sm">
+                  <CalendarDays className="h-4 w-4 mr-2" /> Schedule Session
+                </Button>
+              </CardFooter>
             </Card>
           )}
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-lg">Attendance</CardTitle>
+              <CardDescription>Session attendance overview</CardDescription>
+            </CardHeader>
+            <CardContent className="pt-2">
+              <div className="h-[180px]">
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Tooltip />
+                    <Pie
+                      data={attendanceData}
+                      cx="50%"
+                      cy="50%"
+                      labelLine={false}
+                      outerRadius={60}
+                      fill="#8884d8"
+                      dataKey="value"
+                    >
+                      {attendanceData.map((entry, index) => {
+                        const colors = ["#7E69AB", "#94A3B8", "#E11D48"];
+                        return (
+                          <Cell key={`cell-${index}`} fill={colors[index % colors.length]} />
+                        );
+                      })}
+                    </Pie>
+                    <Legend />
+                  </PieChart>
+                </ResponsiveContainer>
+              </div>
+            </CardContent>
+          </Card>
 
           <Card>
             <CardHeader>
@@ -141,21 +276,29 @@ const ProgressTracker = () => {
         <div className="lg:col-span-3">
           <Card className="h-full">
             <CardHeader>
-              <CardTitle>Progress Chart</CardTitle>
-              <CardDescription>
-                Tracking changes across sessions for {client?.name}
-              </CardDescription>
+              <div className="flex justify-between">
+                <div>
+                  <CardTitle>Progress Chart</CardTitle>
+                  <CardDescription>
+                    Tracking changes across sessions for {client?.name}
+                  </CardDescription>
+                </div>
+                <Select value={chartView} onValueChange={setChartView}>
+                  <SelectTrigger className="w-40">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="line">Line Chart</SelectItem>
+                    <SelectItem value="bar">Bar Chart</SelectItem>
+                    <SelectItem value="radar">Skills Radar</SelectItem>
+                    <SelectItem value="all">All Measures</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
             </CardHeader>
             <CardContent>
-              <Tabs defaultValue="line">
-                <div className="flex justify-between items-center mb-4">
-                  <TabsList>
-                    <TabsTrigger value="line">Line Chart</TabsTrigger>
-                    <TabsTrigger value="all">All Measures</TabsTrigger>
-                  </TabsList>
-                </div>
-                
-                <TabsContent value="line" className="h-[400px]">
+              {chartView === "line" && (
+                <div className="h-[400px]">
                   <ResponsiveContainer width="100%" height="100%">
                     <LineChart
                       data={chartData}
@@ -179,9 +322,49 @@ const ProgressTracker = () => {
                       />
                     </LineChart>
                   </ResponsiveContainer>
-                </TabsContent>
-                
-                <TabsContent value="all" className="h-[400px]">
+                </div>
+              )}
+              
+              {chartView === "bar" && (
+                <div className="h-[400px]">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart
+                      data={chartData}
+                      margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
+                    >
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis dataKey="session" />
+                      <YAxis domain={[0, 100]} />
+                      <Tooltip />
+                      <Legend />
+                      <Bar dataKey={selectedMeasure} 
+                        fill={
+                          selectedMeasure === "anxiety" ? "#e11d48" :
+                          selectedMeasure === "depression" ? "#7E69AB" :
+                          "#22c55e"
+                        }
+                      />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              )}
+              
+              {chartView === "radar" && (
+                <div className="h-[400px]">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <RadarChart outerRadius={150} data={skillsData}>
+                      <PolarGrid />
+                      <PolarAngleAxis dataKey="subject" />
+                      <Radar name="Client Skills" dataKey="A" stroke="#7E69AB" fill="#9b87f5" fillOpacity={0.6} />
+                      <Legend />
+                      <Tooltip />
+                    </RadarChart>
+                  </ResponsiveContainer>
+                </div>
+              )}
+              
+              {chartView === "all" && (
+                <div className="h-[400px]">
                   <ResponsiveContainer width="100%" height="100%">
                     <LineChart
                       data={chartData}
@@ -197,9 +380,14 @@ const ProgressTracker = () => {
                       <Line type="monotone" dataKey="wellbeing" stroke="#22c55e" strokeWidth={2} />
                     </LineChart>
                   </ResponsiveContainer>
-                </TabsContent>
-              </Tabs>
+                </div>
+              )}
             </CardContent>
+            <CardFooter className="flex justify-end border-t pt-4">
+              <Button variant="outline" size="sm">
+                <Download className="h-4 w-4 mr-2" /> Download Chart
+              </Button>
+            </CardFooter>
           </Card>
         </div>
       </div>
@@ -219,27 +407,28 @@ const ProgressTracker = () => {
                   <span className="font-medium">Reduce anxiety in social situations</span>
                   <span className="text-green-600 font-medium">75% Complete</span>
                 </div>
-                <div className="w-full h-2 bg-gray-200 rounded-full">
-                  <div className="bg-therapy-purple h-2 rounded-full" style={{ width: "75%" }}></div>
-                </div>
+                <Progress value={75} className="h-2" indicatorClassName="bg-therapy-purple" />
               </div>
               <div className="space-y-2">
                 <div className="flex justify-between text-sm">
                   <span className="font-medium">Develop healthy coping strategies</span>
                   <span className="text-green-600 font-medium">60% Complete</span>
                 </div>
-                <div className="w-full h-2 bg-gray-200 rounded-full">
-                  <div className="bg-therapy-purple h-2 rounded-full" style={{ width: "60%" }}></div>
-                </div>
+                <Progress value={60} className="h-2" indicatorClassName="bg-therapy-purple" />
               </div>
               <div className="space-y-2">
                 <div className="flex justify-between text-sm">
                   <span className="font-medium">Improve work-life balance</span>
                   <span className="text-green-600 font-medium">40% Complete</span>
                 </div>
-                <div className="w-full h-2 bg-gray-200 rounded-full">
-                  <div className="bg-therapy-purple h-2 rounded-full" style={{ width: "40%" }}></div>
+                <Progress value={40} className="h-2" indicatorClassName="bg-therapy-purple" />
+              </div>
+              <div className="space-y-2">
+                <div className="flex justify-between text-sm">
+                  <span className="font-medium">Build confidence in professional settings</span>
+                  <span className="text-amber-600 font-medium">25% Complete</span>
                 </div>
+                <Progress value={25} className="h-2" indicatorClassName="bg-therapy-purple" />
               </div>
             </div>
           </CardContent>
@@ -270,6 +459,9 @@ const ProgressTracker = () => {
                   Homework compliance has improved.
                 </p>
               </div>
+              <Button variant="outline" size="sm" className="mt-2 w-full">
+                View All Session Notes
+              </Button>
             </div>
           </CardContent>
         </Card>

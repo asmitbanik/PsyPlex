@@ -1,3 +1,4 @@
+
 import { Link } from "react-router-dom";
 import { BrainCircuit, Check, ArrowRight, FileText, LineChart } from "lucide-react";
 
@@ -11,7 +12,7 @@ const Index = () => {
             <div className="w-8 h-8 rounded-full bg-therapy-purple flex items-center justify-center">
               <BrainCircuit size={18} className="text-white" />
             </div>
-            <span className="font-bold text-xl text-therapy-gray">MindfulPro</span>
+            <span className="font-bold text-xl text-therapy-gray">PsyPlex</span>
           </div>
           <div className="flex items-center space-x-4">
             <Link to="/login" className="text-therapy-gray hover:text-therapy-purple transition-colors">
@@ -125,7 +126,7 @@ const Index = () => {
         <div className="container mx-auto px-4 text-center">
           <h2 className="text-3xl font-bold text-therapy-gray mb-6">Ready to transform your therapy practice?</h2>
           <p className="text-xl text-gray-600 mb-10 max-w-2xl mx-auto">
-            Join thousands of therapists who are enhancing their practice with MindfulPro.
+            Join thousands of therapists who are enhancing their practice with PsyPlex.
           </p>
           <Link 
             to="/register" 
@@ -144,10 +145,10 @@ const Index = () => {
               <div className="w-8 h-8 rounded-full bg-therapy-purple flex items-center justify-center">
                 <BrainCircuit size={18} className="text-white" />
               </div>
-              <span className="font-bold text-xl text-therapy-gray">MindfulPro</span>
+              <span className="font-bold text-xl text-therapy-gray">PsyPlex</span>
             </div>
             <div className="text-sm text-gray-500">
-              © 2025 MindfulPro. All rights reserved.
+              © 2025 PsyPlex. All rights reserved.
             </div>
           </div>
         </div>
