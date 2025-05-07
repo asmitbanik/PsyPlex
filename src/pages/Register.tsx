@@ -52,7 +52,7 @@ const Register = () => {
             <div className="w-10 h-10 rounded-full bg-therapy-purple flex items-center justify-center">
               <BrainCircuit size={24} className="text-white" />
             </div>
-            <span className="font-bold text-2xl text-therapy-gray">MindfulPro</span>
+            <span className="font-bold text-2xl text-therapy-gray">PsyPlex</span>
           </Link>
         </div>
 

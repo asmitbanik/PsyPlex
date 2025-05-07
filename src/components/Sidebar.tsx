@@ -30,7 +30,7 @@ const Sidebar = ({ isOpen, setIsOpen }: SidebarProps) => {
           <div className="w-8 h-8 rounded-full bg-therapy-purple flex items-center justify-center">
             <BrainCircuit size={18} className="text-white" />
           </div>
-          <span className="font-semibold text-xl text-therapy-gray">MindfulPro</span>
+          <span className="font-semibold text-xl text-therapy-gray">PsyPlex</span>
         </Link>
         <button 
           onClick={() => setIsOpen(false)}
