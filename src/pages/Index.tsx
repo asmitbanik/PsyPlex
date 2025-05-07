@@ -1,6 +1,5 @@
-
 import { Link } from "react-router-dom";
-import { BrainCircuit, Check, ArrowRight } from "lucide-react";
+import { BrainCircuit, Check, ArrowRight, FileText, LineChart } from "lucide-react";
 
 const Index = () => {
   return (
