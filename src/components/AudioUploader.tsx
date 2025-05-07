@@ -3,7 +3,7 @@ import { useState } from "react";
 import { UploadCloud, X, FileAudio, LoaderCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { toast } from "@/components/ui/use-toast";
+import { toast } from "@/hooks/use-toast";
 
 interface AudioUploaderProps {
   onTranscriptionComplete: (text: string) => void;

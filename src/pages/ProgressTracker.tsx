@@ -15,9 +15,9 @@ import {
   PolarGrid, 
   PolarAngleAxis, 
   Radar,
+  PieChart,
   Pie,
-  Cell,
-  PieChart
+  Cell
 } from "recharts";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
