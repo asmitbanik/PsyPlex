@@ -28,5 +28,12 @@
   "therapistNotes": [
     { "date": "Session 8 - May 1, 2025", "content": "Client continues to make good progress with anxiety management techniques. Reported using deep breathing exercises effectively during a stressful work presentation. Still experiencing some avoidance behaviors in certain social settings." },
     { "date": "Session 6 - April 17, 2025", "content": "Significant breakthrough today in identifying core beliefs related to perfectionism. Client showed good insight into how these beliefs affect work performance and relationships. Homework compliance has improved." }
+  ],
+  "sessionHistory": [
+    { "id": "1", "date": "May 1, 2025", "attendance": "attended", "focusArea": "Anxiety management" },
+    { "id": "2", "date": "April 17, 2025", "attendance": "attended", "focusArea": "Core beliefs" },
+    { "id": "3", "date": "April 3, 2025", "attendance": "attended", "focusArea": "Relaxation techniques" },
+    { "id": "4", "date": "March 20, 2025", "attendance": "attended", "focusArea": "Cognitive distortions" },
+    { "id": "5", "date": "March 6, 2025", "attendance": "canceled", "focusArea": "N/A" }
   ]
 }

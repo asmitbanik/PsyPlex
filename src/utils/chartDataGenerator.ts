@@ -36,3 +36,24 @@ export function calculateProgressMetrics(chartData: any[], selectedMeasure: stri
     isImprovement
   };
 }
+
+/**
+ * Generate trend indicator based on progress
+ */
+export function generateTrendIndicator(value: number, isPositive: boolean) {
+  if (value < 5) return "stable";
+  if (value < 15) return isPositive ? "improving" : "declining";
+  return isPositive ? "significant-improvement" : "significant-decline";
+}
+
+/**
+ * Format dates for better display
+ */
+export function formatSessionDate(dateString: string) {
+  const date = new Date(dateString);
+  return date.toLocaleDateString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric'
+  });
+}
