@@ -1,0 +1,12 @@
+{
+  "chartData": [
+    { "session": "Session 1", "anxiety": 75, "depression": 65, "wellbeing": 45 },
+    { "session": "Session 2", "anxiety": 70, "depression": 60, "wellbeing": 50 },
+    { "session": "Session 3", "anxiety": 65, "depression": 55, "wellbeing": 55 },
+    { "session": "Session 4", "anxiety": 60, "depression": 50, "wellbeing": 60 },
+    { "session": "Session 5", "anxiety": 55, "depression": 45, "wellbeing": 65 },
+    { "session": "Session 6", "anxiety": 50, "depression": 40, "wellbeing": 70 },
+    { "session": "Session 7", "anxiety": 45, "depression": 35, "wellbeing": 75 },
+    { "session": "Session 8", "anxiety": 40, "depression": 30, "wellbeing": 80 }
+  ]
+} 

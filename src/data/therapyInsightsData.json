@@ -1,0 +1,121 @@
+{
+  "therapyTypes": [
+    {
+      "id": "cbt",
+      "name": "Cognitive Behavioral Therapy (CBT)",
+      "insights": {
+        "cognitiveDistortions": [
+          "All-or-nothing thinking: Client expressed feeling like \"a complete failure\" after a minor setback at work.",
+          "Catastrophizing: Client anticipates worst-case scenarios for upcoming social interactions.",
+          "Mental filtering: Client focuses exclusively on negative feedback while discounting positive feedback."
+        ],
+        "behavioralPatterns": [
+          "Avoidance of social situations that trigger anxiety",
+          "Procrastination on work tasks when feeling overwhelmed",
+          "Reduced engagement in previously enjoyed activities"
+        ],
+        "coreBeliefs": [
+          "\"I must be perfect to be accepted by others.\"",
+          "\"I am responsible for other people's happiness.\"",
+          "\"If I make a mistake, it means I'm incompetent.\""
+        ]
+      },
+      "recommendations": {
+        "nextSession": [
+          "Introduce thought record to track cognitive distortions",
+          "Explore evidence for and against the belief \"I must be perfect\"",
+          "Assign behavioral experiment to test predictions about social interactions"
+        ],
+        "homework": [
+          "Daily thought record focusing on situations that trigger anxiety",
+          "Gradual exposure to avoided social situations (hierarchy provided)",
+          "Schedule one enjoyable activity each day"
+        ]
+      }
+    },
+    {
+      "id": "dbt",
+      "name": "Dialectical Behavior Therapy (DBT)",
+      "insights": {
+        "emotionalRegulation": [
+          "Client shows difficulty identifying emotions before they escalate",
+          "Limited use of self-soothing strategies when distressed",
+          "Strong emotional reactions to perceived rejection"
+        ],
+        "interpersonalEffectiveness": [
+          "Difficulty asserting needs in close relationships",
+          "Tendency to either avoid conflict or engage in aggressive communication",
+          "Challenge maintaining self-respect during interpersonal conflicts"
+        ],
+        "distressTolerance": [
+          "Limited repertoire of crisis survival strategies",
+          "Difficulty accepting painful situations that cannot be immediately changed",
+          "Tendency to engage in impulsive behaviors when distressed"
+        ]
+      },
+      "recommendations": {
+        "nextSession": [
+          "Practice emotion identification using diary card",
+          "Introduce DEAR MAN skills for assertive communication",
+          "Develop personalized distress tolerance plan"
+        ],
+        "homework": [
+          "Practice mindfulness exercise for 5 minutes twice daily",
+          "Complete emotion regulation worksheet for intense emotional experiences",
+          "Use interpersonal effectiveness skills in one challenging conversation"
+        ]
+      }
+    },
+    {
+      "id": "psychodynamic",
+      "name": "Psychodynamic Therapy",
+      "insights": {
+        "keyPatterns": [
+          "Note: Detailed insights for this therapy approach would be displayed here based on the analysis of the session notes."
+        ]
+      },
+      "recommendations": {
+        "nextSession": [
+          "Specific recommendations based on the therapeutic approach would be displayed here"
+        ],
+        "homework": [
+          "Specific homework suggestions based on the therapeutic approach would be displayed here"
+        ]
+      }
+    },
+    {
+      "id": "emdr",
+      "name": "EMDR",
+      "insights": {
+        "keyPatterns": [
+          "Note: Detailed insights for this therapy approach would be displayed here based on the analysis of the session notes."
+        ]
+      },
+      "recommendations": {
+        "nextSession": [
+          "Specific recommendations based on the therapeutic approach would be displayed here"
+        ],
+        "homework": [
+          "Specific homework suggestions based on the therapeutic approach would be displayed here"
+        ]
+      }
+    },
+    {
+      "id": "solution-focused",
+      "name": "Solution-Focused Brief Therapy",
+      "insights": {
+        "keyPatterns": [
+          "Note: Detailed insights for this therapy approach would be displayed here based on the analysis of the session notes."
+        ]
+      },
+      "recommendations": {
+        "nextSession": [
+          "Specific recommendations based on the therapeutic approach would be displayed here"
+        ],
+        "homework": [
+          "Specific homework suggestions based on the therapeutic approach would be displayed here"
+        ]
+      }
+    }
+  ]
+} 
