@@ -1,4 +1,3 @@
-
 import { Link, useLocation } from "react-router-dom";
 import { CalendarCheck, Users, FileText, BrainCircuit, LineChart, Home } from "lucide-react";
 
@@ -21,42 +20,42 @@ const Sidebar = ({ isOpen, setIsOpen }: SidebarProps) => {
 
   return (
     <aside 
-      className={`bg-white shadow-md fixed inset-y-0 left-0 z-50 w-64 transform ${
+      className={`bg-therapy-offwhite shadow-xl fixed inset-y-0 left-0 z-50 w-64 transform ${
         isOpen ? "translate-x-0" : "-translate-x-full"
-      } md:translate-x-0 transition-transform duration-200 ease-in-out flex flex-col`}
+      } md:translate-x-0 transition-transform duration-200 ease-in-out flex flex-col border-r border-gray-200`}
     >
-      <div className="flex items-center justify-between p-4 border-b">
-        <Link to="/therapist" className="flex items-center space-x-3">
-          <div className="w-8 h-8 rounded-full bg-therapy-purple flex items-center justify-center">
-            <BrainCircuit size={18} className="text-white" />
+      <div className="flex items-center justify-between p-6 border-b border-gray-200 bg-white/80 backdrop-blur-md">
+        <Link to="/therapist" className="flex items-center space-x-4">
+          <div className="w-12 h-12 rounded-2xl bg-therapy-purple flex items-center justify-center shadow-md">
+            <BrainCircuit size={28} className="text-white" />
           </div>
-          <span className="font-semibold text-xl text-therapy-gray">PsyPlex</span>
+          <span className="font-extrabold text-2xl text-therapy-purple tracking-wide">PsyPlex</span>
         </Link>
         <button 
           onClick={() => setIsOpen(false)}
-          className="md:hidden p-2 rounded-md hover:bg-gray-100"
+          className="md:hidden p-2 rounded-md hover:bg-gray-100 text-2xl font-bold"
         >
           &times;
         </button>
       </div>
 
-      <nav className="flex-1 overflow-y-auto p-4">
-        <ul className="space-y-2">
+      <nav className="flex-1 overflow-y-auto p-6">
+        <ul className="space-y-3">
           {navItems.map((item) => {
             const isActive = location.pathname === item.path || 
                              (item.path !== "/therapist" && location.pathname.startsWith(item.path));
-            
             return (
               <li key={item.name}>
                 <Link
                   to={item.path}
-                  className={`flex items-center space-x-3 px-4 py-3 rounded-lg transition-colors ${
-                    isActive
-                      ? "bg-therapy-purpleLight text-therapy-purple"
-                      : "text-therapy-gray hover:bg-gray-100"
-                  }`}
+                  className={`flex items-center gap-4 px-5 py-3 rounded-xl text-lg font-semibold transition-all group relative
+                    ${isActive
+                      ? "bg-therapy-purple/10 text-therapy-purple border-l-4 border-therapy-purple shadow-sm"
+                      : "text-therapy-gray hover:bg-gray-100 hover:shadow"
+                    }`
+                  }
                 >
-                  {item.icon}
+                  <span className={`flex items-center justify-center w-7 h-7 ${isActive ? 'text-therapy-purple' : 'text-gray-400 group-hover:text-therapy-purple'} transition-colors`}>{item.icon}</span>
                   <span>{item.name}</span>
                 </Link>
               </li>
@@ -65,13 +64,13 @@ const Sidebar = ({ isOpen, setIsOpen }: SidebarProps) => {
         </ul>
       </nav>
 
-      <div className="p-4 border-t">
-        <div className="flex items-center space-x-3">
-          <div className="w-10 h-10 rounded-full bg-therapy-blue flex items-center justify-center text-therapy-purpleDeep font-semibold">
+      <div className="p-6 border-t border-gray-200">
+        <div className="flex items-center gap-4 bg-white/80 rounded-xl p-3 shadow-sm">
+          <div className="w-12 h-12 rounded-full bg-therapy-blue flex items-center justify-center text-therapy-purpleDeep font-bold text-lg shadow">
             TP
           </div>
           <div>
-            <p className="font-medium text-therapy-gray">Dr. Taylor Parker</p>
+            <p className="font-bold text-therapy-gray text-base">Dr. Taylor Parker</p>
             <p className="text-sm text-gray-500">Clinical Psychologist</p>
           </div>
         </div>

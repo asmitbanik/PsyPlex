@@ -59,92 +59,85 @@ const TherapyInsights = () => {
   );
 
   return (
-    <div className="space-y-6">
-      <h1 className="text-3xl font-bold text-therapy-gray">Therapy Insights</h1>
-      <p className="text-gray-600">
+    <div className="max-w-4xl mx-auto py-8 px-2 md:px-0">
+      <h1 className="text-4xl font-bold text-therapy-gray mb-2">Therapy Insights</h1>
+      <p className="text-lg text-gray-600 mb-8">
         Generate structured insights from your session notes based on different therapeutic approaches.
       </p>
-      
-      <Card>
+      <Card className="mb-8 shadow-lg rounded-2xl border border-gray-200">
         <CardHeader>
-          <CardTitle>Session Analysis</CardTitle>
-          <CardDescription>
+          <CardTitle className="text-2xl font-bold text-therapy-gray">Session Analysis</CardTitle>
+          <CardDescription className="text-base text-gray-500">
             Enter session notes or record/upload audio to generate insights
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
-          <div className="space-y-4">
-            <label className="text-sm font-medium">
-              Therapeutic Approach
-            </label>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          <div className="space-y-2">
+            <label className="text-base font-semibold text-therapy-gray mb-2 block">Therapeutic Approach</label>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               <Button
                 variant={selectedTherapy === "cbt" ? "default" : "outline"}
-                className={`flex flex-col items-center justify-center h-auto py-4 px-3 ${
-                  selectedTherapy === "cbt" ? "bg-therapy-purple hover:bg-therapy-purpleDeep" : ""
+                className={`flex flex-col items-center justify-center h-auto py-6 px-3 rounded-xl shadow-md transition-all border-2 ${
+                  selectedTherapy === "cbt" ? "bg-therapy-purple/90 border-therapy-purple text-white" : "border-gray-200 bg-white"
                 }`}
                 onClick={() => setSelectedTherapy("cbt")}
               >
-                <Brain className="h-6 w-6 mb-2" />
-                <span className="text-sm font-medium mb-1">SOAP</span>
-                <span className="text-xs text-muted-foreground text-center leading-tight block w-full whitespace-normal break-words mt-1">
+                <Brain className="h-7 w-7 mb-2" />
+                <span className="text-base font-bold mb-1">SOAP</span>
+                <span className="text-xs text-center leading-tight block w-full whitespace-normal break-words mt-1">
                   Subjective, Objective, Assessment, Plan
                 </span>
               </Button>
-              
               <Button
                 variant={selectedTherapy === "dbt" ? "default" : "outline"}
-                className={`flex flex-col items-center justify-center h-auto py-4 px-3 ${
-                  selectedTherapy === "dbt" ? "bg-therapy-purple hover:bg-therapy-purpleDeep" : ""
+                className={`flex flex-col items-center justify-center h-auto py-6 px-3 rounded-xl shadow-md transition-all border-2 ${
+                  selectedTherapy === "dbt" ? "bg-therapy-blue/90 border-therapy-blue text-white" : "border-gray-200 bg-white"
                 }`}
                 onClick={() => setSelectedTherapy("dbt")}
               >
-                <Heart className="h-6 w-6 mb-2" />
-                <span className="text-sm font-medium mb-1">BIRP</span>
-                <span className="text-xs text-muted-foreground text-center leading-tight block w-full whitespace-normal break-words mt-1">
+                <Heart className="h-7 w-7 mb-2" />
+                <span className="text-base font-bold mb-1">BIRP</span>
+                <span className="text-xs text-center leading-tight block w-full whitespace-normal break-words mt-1">
                   Behavior, Intervention, Response, Plan
                 </span>
               </Button>
-              
               <Button
                 variant={selectedTherapy === "psychodynamic" ? "default" : "outline"}
-                className={`flex flex-col items-center justify-center h-auto py-4 px-3 ${
-                  selectedTherapy === "psychodynamic" ? "bg-therapy-purple hover:bg-therapy-purpleDeep" : ""
+                className={`flex flex-col items-center justify-center h-auto py-6 px-3 rounded-xl shadow-md transition-all border-2 ${
+                  selectedTherapy === "psychodynamic" ? "bg-therapy-green/90 border-therapy-green text-white" : "border-gray-200 bg-white"
                 }`}
                 onClick={() => setSelectedTherapy("psychodynamic")}
               >
-                <Target className="h-6 w-6 mb-2" />
-                <span className="text-sm font-medium mb-1">DAP</span>
-                <span className="text-xs text-muted-foreground text-center leading-tight block w-full whitespace-normal break-words mt-1">
+                <Target className="h-7 w-7 mb-2" />
+                <span className="text-base font-bold mb-1">DAP</span>
+                <span className="text-xs text-center leading-tight block w-full whitespace-normal break-words mt-1">
                   Data, Assessment, Plan
                 </span>
               </Button>
-              
               <Button
                 variant={selectedTherapy === "solution-focused" ? "default" : "outline"}
-                className={`flex flex-col items-center justify-center h-auto py-4 px-3 ${
-                  selectedTherapy === "solution-focused" ? "bg-therapy-purple hover:bg-therapy-purpleDeep" : ""
+                className={`flex flex-col items-center justify-center h-auto py-6 px-3 rounded-xl shadow-md transition-all border-2 ${
+                  selectedTherapy === "solution-focused" ? "bg-therapy-orange/90 border-therapy-orange text-white" : "border-gray-200 bg-white"
                 }`}
                 onClick={() => setSelectedTherapy("solution-focused")}
               >
-                <ScrollText className="h-6 w-6 mb-2" />
-                <span className="text-sm font-medium mb-1">Scribbled Notes</span>
-                <span className="text-xs text-muted-foreground text-center leading-tight block w-full whitespace-normal break-words mt-1">
+                <ScrollText className="h-7 w-7 mb-2" />
+                <span className="text-base font-bold mb-1">Scribbled Notes</span>
+                <span className="text-xs text-center leading-tight block w-full whitespace-normal break-words mt-1">
                   Free-form session notes
                 </span>
               </Button>
             </div>
           </div>
-          
           <div className="space-y-2">
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-2">
-              <label className="text-sm font-medium">Input Method</label>
+              <label className="text-base font-semibold text-therapy-gray">Input Method</label>
               <div className="flex space-x-2 mt-1 sm:mt-0">
                 <Button 
                   variant={inputMethod === "text" ? "default" : "outline"} 
                   size="sm"
                   onClick={() => setInputMethod("text")}
-                  className={inputMethod === "text" ? "bg-therapy-purple hover:bg-therapy-purpleDeep" : ""}
+                  className={`rounded-full ${inputMethod === "text" ? "bg-therapy-purple hover:bg-therapy-purpleDeep text-white" : ""}`}
                 >
                   <FileText className="mr-2 h-4 w-4" />
                   Text Input
@@ -153,7 +146,7 @@ const TherapyInsights = () => {
                   variant={inputMethod === "live" ? "default" : "outline"} 
                   size="sm"
                   onClick={() => setInputMethod("live")}
-                  className={inputMethod === "live" ? "bg-therapy-purple hover:bg-therapy-purpleDeep" : ""}
+                  className={`rounded-full ${inputMethod === "live" ? "bg-therapy-purple hover:bg-therapy-purpleDeep text-white" : ""}`}
                 >
                   <Mic className="mr-2 h-4 w-4" />
                   Live Recording
@@ -162,41 +155,40 @@ const TherapyInsights = () => {
                   variant={inputMethod === "audio" ? "default" : "outline"} 
                   size="sm"
                   onClick={() => setInputMethod("audio")}
-                  className={inputMethod === "audio" ? "bg-therapy-purple hover:bg-therapy-purpleDeep" : ""}
+                  className={`rounded-full ${inputMethod === "audio" ? "bg-therapy-purple hover:bg-therapy-purpleDeep text-white" : ""}`}
                 >
                   <AudioWaveform className="mr-2 h-4 w-4" />
                   Audio Upload
                 </Button>
               </div>
             </div>
-
-            {inputMethod === "text" ? (
-              <Textarea
-                id="session-notes"
-                placeholder="Enter your session notes here..."
-                className="h-40"
-                value={sessionNotes}
-                onChange={(e) => setSessionNotes(e.target.value)}
-              />
-            ) : inputMethod === "live" ? (
-              <LiveRecorder onTranscriptionComplete={handleTranscriptionComplete} />
-            ) : (
-              <AudioUploader onTranscriptionComplete={handleTranscriptionComplete} />
-            )}
-            
-            {(inputMethod === "audio" || inputMethod === "live") && sessionNotes && (
-              <div className="mt-4">
-                <h3 className="text-sm font-medium mb-2">Transcription:</h3>
-                <div className="p-3 bg-muted rounded-md">
-                  <p className="text-sm">{sessionNotes}</p>
+            <div className="bg-gray-50 rounded-xl p-4 shadow-inner">
+              {inputMethod === "text" ? (
+                <Textarea
+                  id="session-notes"
+                  placeholder="Enter your session notes here..."
+                  className="h-40 rounded-lg shadow-sm"
+                  value={sessionNotes}
+                  onChange={(e) => setSessionNotes(e.target.value)}
+                />
+              ) : inputMethod === "live" ? (
+                <LiveRecorder onTranscriptionComplete={handleTranscriptionComplete} />
+              ) : (
+                <AudioUploader onTranscriptionComplete={handleTranscriptionComplete} />
+              )}
+              {(inputMethod === "audio" || inputMethod === "live") && sessionNotes && (
+                <div className="mt-4">
+                  <h3 className="text-sm font-medium mb-2">Transcription:</h3>
+                  <div className="p-3 bg-muted rounded-md">
+                    <p className="text-sm">{sessionNotes}</p>
+                  </div>
                 </div>
-              </div>
-            )}
+              )}
+            </div>
           </div>
-          
           <div className="flex justify-end">
             <Button
-              className="bg-therapy-purple hover:bg-therapy-purpleDeep"
+              className="bg-therapy-purple hover:bg-therapy-purpleDeep rounded-full px-8 py-3 text-lg font-semibold shadow-md"
               onClick={handleGenerateInsights}
               disabled={isGenerating || !sessionNotes.trim()}
             >
@@ -207,137 +199,133 @@ const TherapyInsights = () => {
       </Card>
 
       {insightsGenerated && selectedTherapyData && (
-        <div className="space-y-6 animate-fade-in">
-          <h2 className="text-2xl font-semibold text-therapy-gray">
-            {selectedTherapyData.name} Insights
-          </h2>
-
-          <Tabs defaultValue="insights" className="w-full">
-            <TabsList className="grid w-full md:w-1/2 grid-cols-2">
-              <TabsTrigger value="insights">Key Insights</TabsTrigger>
-              <TabsTrigger value="recommendations">Recommendations</TabsTrigger>
-            </TabsList>
-            
-            <TabsContent value="insights">
-              {selectedTherapy === "cbt" && (
-                <>
-                  <InsightCard 
-                    title="Cognitive Distortions" 
-                    description="Identified thought patterns that may be reinforcing negative emotions"
-                  >
-                    <ul className="list-disc pl-5 space-y-2">
-                      {selectedTherapyData.insights.cognitiveDistortions.map((distortion, index) => (
-                        <li key={index}>{distortion}</li>
-                      ))}
-                    </ul>
-                  </InsightCard>
-                  
-                  <InsightCard 
-                    title="Behavioral Patterns" 
-                    description="Observed behaviors that may be maintaining the presenting problems"
-                  >
-                    <ul className="list-disc pl-5 space-y-2">
-                      {selectedTherapyData.insights.behavioralPatterns.map((pattern, index) => (
-                        <li key={index}>{pattern}</li>
-                      ))}
-                    </ul>
-                  </InsightCard>
-                  
-                  <InsightCard 
-                    title="Core Beliefs" 
-                    description="Underlying beliefs that may be contributing to current difficulties"
-                  >
-                    <ul className="list-disc pl-5 space-y-2">
-                      {selectedTherapyData.insights.coreBeliefs.map((belief, index) => (
-                        <li key={index}>{belief}</li>
-                      ))}
-                    </ul>
-                  </InsightCard>
-                </>
-              )}
-
-              {selectedTherapy === "dbt" && (
-                <>
-                  <InsightCard 
-                    title="Emotional Regulation" 
-                    description="Observations related to emotional awareness and regulation"
-                  >
-                    <ul className="list-disc pl-5 space-y-2">
-                      {selectedTherapyData.insights.emotionalRegulation.map((item, index) => (
-                        <li key={index}>{item}</li>
-                      ))}
-                    </ul>
-                  </InsightCard>
-                  
-                  <InsightCard 
-                    title="Interpersonal Effectiveness" 
-                    description="Skills and challenges in relationships with others"
-                  >
-                    <ul className="list-disc pl-5 space-y-2">
-                      {selectedTherapyData.insights.interpersonalEffectiveness.map((item, index) => (
-                        <li key={index}>{item}</li>
-                      ))}
-                    </ul>
-                  </InsightCard>
-                  
-                  <InsightCard 
-                    title="Distress Tolerance" 
-                    description="Ability to tolerate and survive crisis situations"
-                  >
-                    <ul className="list-disc pl-5 space-y-2">
-                      {selectedTherapyData.insights.distressTolerance.map((item, index) => (
-                        <li key={index}>{item}</li>
-                      ))}
-                    </ul>
-                  </InsightCard>
-                </>
-              )}
-
-              {(selectedTherapy === "psychodynamic" || selectedTherapy === "solution-focused") && (
-                <InsightCard 
-                  title="Key Patterns and Themes" 
-                  description="Main observations from this therapy approach"
-                >
-                  <ul className="list-disc pl-5 space-y-2">
-                    {selectedTherapyData.insights.keyPatterns.map((pattern, index) => (
-                      <li key={index}>{pattern}</li>
-                    ))}
-                  </ul>
-                </InsightCard>
-              )}
-            </TabsContent>
-            
-            <TabsContent value="recommendations">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Treatment Recommendations</CardTitle>
-                  <CardDescription>
-                    Suggested therapeutic interventions based on session insights
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="space-y-2">
-                    <h3 className="font-medium text-therapy-gray">For Next Session</h3>
-                    <ul className="list-disc pl-5 space-y-2 text-gray-600">
-                      {selectedTherapyData.recommendations.nextSession.map((item, index) => (
-                        <li key={index}>{item}</li>
-                      ))}
-                    </ul>
-                  </div>
-                  
-                  <div className="space-y-2">
-                    <h3 className="font-medium text-therapy-gray">Homework Suggestions</h3>
-                    <ul className="list-disc pl-5 space-y-2 text-gray-600">
-                      {selectedTherapyData.recommendations.homework.map((item, index) => (
-                        <li key={index}>{item}</li>
-                      ))}
-                    </ul>
-                  </div>
-                </CardContent>
-              </Card>
-            </TabsContent>
-          </Tabs>
-        </div>
+        <Card className="shadow-lg rounded-2xl border border-gray-200 animate-fade-in">
+          <CardHeader>
+            <CardTitle className="text-2xl font-bold text-therapy-gray">
+              {selectedTherapyData.name} Insights
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <Tabs defaultValue="insights" className="w-full">
+              <TabsList className="grid w-full md:w-1/2 grid-cols-2 bg-gray-100 rounded-lg mb-4">
+                <TabsTrigger value="insights" className="rounded-l-lg text-base font-semibold">Key Insights</TabsTrigger>
+                <TabsTrigger value="recommendations" className="rounded-r-lg text-base font-semibold">Recommendations</TabsTrigger>
+              </TabsList>
+              <TabsContent value="insights">
+                <div className="space-y-4 pt-2">
+                  {selectedTherapy === "cbt" && (
+                    <>
+                      <InsightCard 
+                        title="Cognitive Distortions" 
+                        description="Identified thought patterns that may be reinforcing negative emotions"
+                      >
+                        <ul className="list-disc pl-5 space-y-2">
+                          {selectedTherapyData.insights.cognitiveDistortions.map((distortion, index) => (
+                            <li key={index}>{distortion}</li>
+                          ))}
+                        </ul>
+                      </InsightCard>
+                      <InsightCard 
+                        title="Behavioral Patterns" 
+                        description="Observed behaviors that may be maintaining the presenting problems"
+                      >
+                        <ul className="list-disc pl-5 space-y-2">
+                          {selectedTherapyData.insights.behavioralPatterns.map((pattern, index) => (
+                            <li key={index}>{pattern}</li>
+                          ))}
+                        </ul>
+                      </InsightCard>
+                      <InsightCard 
+                        title="Core Beliefs" 
+                        description="Underlying beliefs that may be contributing to current difficulties"
+                      >
+                        <ul className="list-disc pl-5 space-y-2">
+                          {selectedTherapyData.insights.coreBeliefs.map((belief, index) => (
+                            <li key={index}>{belief}</li>
+                          ))}
+                        </ul>
+                      </InsightCard>
+                    </>
+                  )}
+                  {selectedTherapy === "dbt" && (
+                    <>
+                      <InsightCard 
+                        title="Emotional Regulation" 
+                        description="Observations related to emotional awareness and regulation"
+                      >
+                        <ul className="list-disc pl-5 space-y-2">
+                          {selectedTherapyData.insights.emotionalRegulation.map((item, index) => (
+                            <li key={index}>{item}</li>
+                          ))}
+                        </ul>
+                      </InsightCard>
+                      <InsightCard 
+                        title="Interpersonal Effectiveness" 
+                        description="Skills and challenges in relationships with others"
+                      >
+                        <ul className="list-disc pl-5 space-y-2">
+                          {selectedTherapyData.insights.interpersonalEffectiveness.map((item, index) => (
+                            <li key={index}>{item}</li>
+                          ))}
+                        </ul>
+                      </InsightCard>
+                      <InsightCard 
+                        title="Distress Tolerance" 
+                        description="Ability to tolerate and survive crisis situations"
+                      >
+                        <ul className="list-disc pl-5 space-y-2">
+                          {selectedTherapyData.insights.distressTolerance.map((item, index) => (
+                            <li key={index}>{item}</li>
+                          ))}
+                        </ul>
+                      </InsightCard>
+                    </>
+                  )}
+                  {(selectedTherapy === "psychodynamic" || selectedTherapy === "solution-focused") && (
+                    <InsightCard 
+                      title="Key Patterns and Themes" 
+                      description="Main observations from this therapy approach"
+                    >
+                      <ul className="list-disc pl-5 space-y-2">
+                        {selectedTherapyData.insights.keyPatterns.map((pattern, index) => (
+                          <li key={index}>{pattern}</li>
+                        ))}
+                      </ul>
+                    </InsightCard>
+                  )}
+                </div>
+              </TabsContent>
+              <TabsContent value="recommendations">
+                <Card className="mt-2 rounded-xl border border-gray-100 shadow-sm">
+                  <CardHeader>
+                    <CardTitle className="text-xl font-semibold text-therapy-gray">Treatment Recommendations</CardTitle>
+                    <CardDescription className="text-base text-gray-500">
+                      Suggested therapeutic interventions based on session insights
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="space-y-2">
+                      <h3 className="font-medium text-therapy-gray">For Next Session</h3>
+                      <ul className="list-disc pl-5 space-y-2 text-gray-600">
+                        {selectedTherapyData.recommendations.nextSession.map((item, index) => (
+                          <li key={index}>{item}</li>
+                        ))}
+                      </ul>
+                    </div>
+                    <div className="space-y-2">
+                      <h3 className="font-medium text-therapy-gray">Homework Suggestions</h3>
+                      <ul className="list-disc pl-5 space-y-2 text-gray-600">
+                        {selectedTherapyData.recommendations.homework.map((item, index) => (
+                          <li key={index}>{item}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  </CardContent>
+                </Card>
+              </TabsContent>
+            </Tabs>
+          </CardContent>
+        </Card>
       )}
     </div>
   );
