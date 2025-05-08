@@ -1,13 +1,13 @@
 import { useState } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "@/hooks/use-toast";
 import AudioUploader from "@/components/AudioUploader";
 import LiveRecorder from "@/components/LiveRecorder";
-import { FileText, AudioWaveform, Mic } from "lucide-react";
+import { FileText, AudioWaveform, Mic, Brain, Heart, Target, ScrollText } from "lucide-react";
+import therapyInsightsData from "@/data/therapyInsightsData.json";
 
 interface InsightCardProps {
   title: string;
@@ -54,6 +54,10 @@ const TherapyInsights = () => {
     setSessionNotes(transcription);
   };
 
+  const selectedTherapyData = therapyInsightsData.therapyTypes.find(
+    therapy => therapy.id === selectedTherapy
+  );
+
   return (
     <div className="space-y-6">
       <h1 className="text-3xl font-bold text-therapy-gray">Therapy Insights</h1>
@@ -68,23 +72,68 @@ const TherapyInsights = () => {
             Enter session notes or record/upload audio to generate insights
           </CardDescription>
         </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="space-y-2">
-            <label htmlFor="therapy-type" className="text-sm font-medium">
+        <CardContent className="space-y-6">
+          <div className="space-y-4">
+            <label className="text-sm font-medium">
               Therapeutic Approach
             </label>
-            <Select value={selectedTherapy} onValueChange={setSelectedTherapy}>
-              <SelectTrigger id="therapy-type" className="w-full md:w-1/2">
-                <SelectValue placeholder="Select therapy type" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="cbt">Cognitive Behavioral Therapy (CBT)</SelectItem>
-                <SelectItem value="dbt">Dialectical Behavior Therapy (DBT)</SelectItem>
-                <SelectItem value="psychodynamic">Psychodynamic Therapy</SelectItem>
-                <SelectItem value="emdr">EMDR</SelectItem>
-                <SelectItem value="solution-focused">Solution-Focused Brief Therapy</SelectItem>
-              </SelectContent>
-            </Select>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+              <Button
+                variant={selectedTherapy === "cbt" ? "default" : "outline"}
+                className={`flex flex-col items-center justify-center h-auto py-4 px-3 ${
+                  selectedTherapy === "cbt" ? "bg-therapy-purple hover:bg-therapy-purpleDeep" : ""
+                }`}
+                onClick={() => setSelectedTherapy("cbt")}
+              >
+                <Brain className="h-6 w-6 mb-2" />
+                <span className="text-sm font-medium mb-1">SOAP</span>
+                <span className="text-xs text-muted-foreground text-center leading-tight block w-full whitespace-normal break-words mt-1">
+                  Subjective, Objective, Assessment, Plan
+                </span>
+              </Button>
+              
+              <Button
+                variant={selectedTherapy === "dbt" ? "default" : "outline"}
+                className={`flex flex-col items-center justify-center h-auto py-4 px-3 ${
+                  selectedTherapy === "dbt" ? "bg-therapy-purple hover:bg-therapy-purpleDeep" : ""
+                }`}
+                onClick={() => setSelectedTherapy("dbt")}
+              >
+                <Heart className="h-6 w-6 mb-2" />
+                <span className="text-sm font-medium mb-1">BIRP</span>
+                <span className="text-xs text-muted-foreground text-center leading-tight block w-full whitespace-normal break-words mt-1">
+                  Behavior, Intervention, Response, Plan
+                </span>
+              </Button>
+              
+              <Button
+                variant={selectedTherapy === "psychodynamic" ? "default" : "outline"}
+                className={`flex flex-col items-center justify-center h-auto py-4 px-3 ${
+                  selectedTherapy === "psychodynamic" ? "bg-therapy-purple hover:bg-therapy-purpleDeep" : ""
+                }`}
+                onClick={() => setSelectedTherapy("psychodynamic")}
+              >
+                <Target className="h-6 w-6 mb-2" />
+                <span className="text-sm font-medium mb-1">DAP</span>
+                <span className="text-xs text-muted-foreground text-center leading-tight block w-full whitespace-normal break-words mt-1">
+                  Data, Assessment, Plan
+                </span>
+              </Button>
+              
+              <Button
+                variant={selectedTherapy === "solution-focused" ? "default" : "outline"}
+                className={`flex flex-col items-center justify-center h-auto py-4 px-3 ${
+                  selectedTherapy === "solution-focused" ? "bg-therapy-purple hover:bg-therapy-purpleDeep" : ""
+                }`}
+                onClick={() => setSelectedTherapy("solution-focused")}
+              >
+                <ScrollText className="h-6 w-6 mb-2" />
+                <span className="text-sm font-medium mb-1">Scribbled Notes</span>
+                <span className="text-xs text-muted-foreground text-center leading-tight block w-full whitespace-normal break-words mt-1">
+                  Free-form session notes
+                </span>
+              </Button>
+            </div>
           </div>
           
           <div className="space-y-2">
@@ -157,14 +206,10 @@ const TherapyInsights = () => {
         </CardContent>
       </Card>
 
-      {insightsGenerated && (
+      {insightsGenerated && selectedTherapyData && (
         <div className="space-y-6 animate-fade-in">
           <h2 className="text-2xl font-semibold text-therapy-gray">
-            {selectedTherapy === "cbt" && "Cognitive Behavioral Therapy Insights"}
-            {selectedTherapy === "dbt" && "Dialectical Behavior Therapy Insights"}
-            {selectedTherapy === "psychodynamic" && "Psychodynamic Therapy Insights"}
-            {selectedTherapy === "emdr" && "EMDR Therapy Insights"}
-            {selectedTherapy === "solution-focused" && "Solution-Focused Brief Therapy Insights"}
+            {selectedTherapyData.name} Insights
           </h2>
 
           <Tabs defaultValue="insights" className="w-full">
@@ -172,7 +217,8 @@ const TherapyInsights = () => {
               <TabsTrigger value="insights">Key Insights</TabsTrigger>
               <TabsTrigger value="recommendations">Recommendations</TabsTrigger>
             </TabsList>
-            <TabsContent value="insights" className="space-y-4 pt-4">
+            
+            <TabsContent value="insights">
               {selectedTherapy === "cbt" && (
                 <>
                   <InsightCard 
@@ -180,9 +226,9 @@ const TherapyInsights = () => {
                     description="Identified thought patterns that may be reinforcing negative emotions"
                   >
                     <ul className="list-disc pl-5 space-y-2">
-                      <li>All-or-nothing thinking: Client expressed feeling like "a complete failure" after a minor setback at work.</li>
-                      <li>Catastrophizing: Client anticipates worst-case scenarios for upcoming social interactions.</li>
-                      <li>Mental filtering: Client focuses exclusively on negative feedback while discounting positive feedback.</li>
+                      {selectedTherapyData.insights.cognitiveDistortions.map((distortion, index) => (
+                        <li key={index}>{distortion}</li>
+                      ))}
                     </ul>
                   </InsightCard>
                   
@@ -191,9 +237,9 @@ const TherapyInsights = () => {
                     description="Observed behaviors that may be maintaining the presenting problems"
                   >
                     <ul className="list-disc pl-5 space-y-2">
-                      <li>Avoidance of social situations that trigger anxiety</li>
-                      <li>Procrastination on work tasks when feeling overwhelmed</li>
-                      <li>Reduced engagement in previously enjoyed activities</li>
+                      {selectedTherapyData.insights.behavioralPatterns.map((pattern, index) => (
+                        <li key={index}>{pattern}</li>
+                      ))}
                     </ul>
                   </InsightCard>
                   
@@ -202,9 +248,9 @@ const TherapyInsights = () => {
                     description="Underlying beliefs that may be contributing to current difficulties"
                   >
                     <ul className="list-disc pl-5 space-y-2">
-                      <li>"I must be perfect to be accepted by others."</li>
-                      <li>"I am responsible for other people's happiness."</li>
-                      <li>"If I make a mistake, it means I'm incompetent."</li>
+                      {selectedTherapyData.insights.coreBeliefs.map((belief, index) => (
+                        <li key={index}>{belief}</li>
+                      ))}
                     </ul>
                   </InsightCard>
                 </>
@@ -217,9 +263,9 @@ const TherapyInsights = () => {
                     description="Observations related to emotional awareness and regulation"
                   >
                     <ul className="list-disc pl-5 space-y-2">
-                      <li>Client shows difficulty identifying emotions before they escalate</li>
-                      <li>Limited use of self-soothing strategies when distressed</li>
-                      <li>Strong emotional reactions to perceived rejection</li>
+                      {selectedTherapyData.insights.emotionalRegulation.map((item, index) => (
+                        <li key={index}>{item}</li>
+                      ))}
                     </ul>
                   </InsightCard>
                   
@@ -228,9 +274,9 @@ const TherapyInsights = () => {
                     description="Skills and challenges in relationships with others"
                   >
                     <ul className="list-disc pl-5 space-y-2">
-                      <li>Difficulty asserting needs in close relationships</li>
-                      <li>Tendency to either avoid conflict or engage in aggressive communication</li>
-                      <li>Challenge maintaining self-respect during interpersonal conflicts</li>
+                      {selectedTherapyData.insights.interpersonalEffectiveness.map((item, index) => (
+                        <li key={index}>{item}</li>
+                      ))}
                     </ul>
                   </InsightCard>
                   
@@ -239,28 +285,29 @@ const TherapyInsights = () => {
                     description="Ability to tolerate and survive crisis situations"
                   >
                     <ul className="list-disc pl-5 space-y-2">
-                      <li>Limited repertoire of crisis survival strategies</li>
-                      <li>Difficulty accepting painful situations that cannot be immediately changed</li>
-                      <li>Tendency to engage in impulsive behaviors when distressed</li>
+                      {selectedTherapyData.insights.distressTolerance.map((item, index) => (
+                        <li key={index}>{item}</li>
+                      ))}
                     </ul>
                   </InsightCard>
                 </>
               )}
 
-              {/* Similar structures for other therapy types */}
-              {(selectedTherapy === "psychodynamic" || selectedTherapy === "emdr" || selectedTherapy === "solution-focused") && (
+              {(selectedTherapy === "psychodynamic" || selectedTherapy === "solution-focused") && (
                 <InsightCard 
                   title="Key Patterns and Themes" 
                   description="Main observations from this therapy approach"
                 >
-                  <p className="text-gray-600 italic">
-                    Note: Detailed insights for this therapy approach would be displayed here based on the analysis of the session notes.
-                  </p>
+                  <ul className="list-disc pl-5 space-y-2">
+                    {selectedTherapyData.insights.keyPatterns.map((pattern, index) => (
+                      <li key={index}>{pattern}</li>
+                    ))}
+                  </ul>
                 </InsightCard>
               )}
             </TabsContent>
             
-            <TabsContent value="recommendations" className="space-y-4 pt-4">
+            <TabsContent value="recommendations">
               <Card>
                 <CardHeader>
                   <CardTitle>Treatment Recommendations</CardTitle>
@@ -272,46 +319,18 @@ const TherapyInsights = () => {
                   <div className="space-y-2">
                     <h3 className="font-medium text-therapy-gray">For Next Session</h3>
                     <ul className="list-disc pl-5 space-y-2 text-gray-600">
-                      {selectedTherapy === "cbt" && (
-                        <>
-                          <li>Introduce thought record to track cognitive distortions</li>
-                          <li>Explore evidence for and against the belief "I must be perfect"</li>
-                          <li>Assign behavioral experiment to test predictions about social interactions</li>
-                        </>
-                      )}
-                      {selectedTherapy === "dbt" && (
-                        <>
-                          <li>Practice emotion identification using diary card</li>
-                          <li>Introduce DEAR MAN skills for assertive communication</li>
-                          <li>Develop personalized distress tolerance plan</li>
-                        </>
-                      )}
-                      {selectedTherapy !== "cbt" && selectedTherapy !== "dbt" && (
-                        <li>Specific recommendations based on the therapeutic approach would be displayed here</li>
-                      )}
+                      {selectedTherapyData.recommendations.nextSession.map((item, index) => (
+                        <li key={index}>{item}</li>
+                      ))}
                     </ul>
                   </div>
                   
                   <div className="space-y-2">
                     <h3 className="font-medium text-therapy-gray">Homework Suggestions</h3>
                     <ul className="list-disc pl-5 space-y-2 text-gray-600">
-                      {selectedTherapy === "cbt" && (
-                        <>
-                          <li>Daily thought record focusing on situations that trigger anxiety</li>
-                          <li>Gradual exposure to avoided social situations (hierarchy provided)</li>
-                          <li>Schedule one enjoyable activity each day</li>
-                        </>
-                      )}
-                      {selectedTherapy === "dbt" && (
-                        <>
-                          <li>Practice mindfulness exercise for 5 minutes twice daily</li>
-                          <li>Complete emotion regulation worksheet for intense emotional experiences</li>
-                          <li>Use interpersonal effectiveness skills in one challenging conversation</li>
-                        </>
-                      )}
-                      {selectedTherapy !== "cbt" && selectedTherapy !== "dbt" && (
-                        <li>Specific homework suggestions based on the therapeutic approach would be displayed here</li>
-                      )}
+                      {selectedTherapyData.recommendations.homework.map((item, index) => (
+                        <li key={index}>{item}</li>
+                      ))}
                     </ul>
                   </div>
                 </CardContent>
