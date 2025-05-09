@@ -1,5 +1,6 @@
 import { Link, useLocation } from "react-router-dom";
-import { CalendarCheck, Users, FileText, BrainCircuit, LineChart, Home } from "lucide-react";
+import { CalendarCheck, Users, FileText, BrainCircuit, LineChart, Home, UserCircle } from "lucide-react";
+import { ProfileMenu } from "./ProfileMenu";
 
 interface SidebarProps {
   isOpen: boolean;
@@ -8,8 +9,7 @@ interface SidebarProps {
 
 const Sidebar = ({ isOpen, setIsOpen }: SidebarProps) => {
   const location = useLocation();
-  
-  const navItems = [
+    const navItems = [
     { name: "Dashboard", path: "/therapist", icon: <Home className="w-5 h-5" /> },
     { name: "Clients", path: "/therapist/clients", icon: <Users className="w-5 h-5" /> },
     { name: "Sessions", path: "/therapist/sessions", icon: <CalendarCheck className="w-5 h-5" /> },
@@ -62,18 +62,8 @@ const Sidebar = ({ isOpen, setIsOpen }: SidebarProps) => {
             );
           })}
         </ul>
-      </nav>
-
-      <div className="p-6 border-t border-gray-200">
-        <div className="flex items-center gap-4 bg-white/80 rounded-xl p-3 shadow-sm">
-          <div className="w-12 h-12 rounded-full bg-therapy-blue flex items-center justify-center text-therapy-purpleDeep font-bold text-lg shadow">
-            TP
-          </div>
-          <div>
-            <p className="font-bold text-therapy-gray text-base">Dr. Taylor Parker</p>
-            <p className="text-sm text-gray-500">Clinical Psychologist</p>
-          </div>
-        </div>
+      </nav>      <div className="p-6 border-t border-gray-200">
+        <ProfileMenu />
       </div>
     </aside>
   );

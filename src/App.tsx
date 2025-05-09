@@ -46,8 +46,7 @@ const App = () => {
               <Route element={<Layout />}>
                 <Route index element={<Dashboard />} />
                 <Route path="clients" element={<Clients />} />
-                <Route path="clients/:clientId" element={<ClientDetails />} />
-                <Route path="sessions" element={<Sessions />} />
+                <Route path="clients/:clientId" element={<ClientDetails />} />                <Route path="sessions" element={<Sessions />} />
                 <Route path="insights" element={<TherapyInsights />} />
                 <Route path="progress" element={<ProgressTracker />} />
                 <Route path="notes" element={<Notes />} />
