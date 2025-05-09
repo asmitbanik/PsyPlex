@@ -16,6 +16,7 @@ import ClientDetails from "./pages/ClientDetails";
 import Sessions from "./pages/Sessions";
 import TherapyInsights from "./pages/TherapyInsights";
 import ProgressTracker from "./pages/ProgressTracker";
+import Notes from "./pages/Notes";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
 import Layout from "./components/Layout";
@@ -49,6 +50,7 @@ const App = () => {
                 <Route path="sessions" element={<Sessions />} />
                 <Route path="insights" element={<TherapyInsights />} />
                 <Route path="progress" element={<ProgressTracker />} />
+                <Route path="notes" element={<Notes />} />
               </Route>
             </Route>
 

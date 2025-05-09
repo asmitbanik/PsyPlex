@@ -8,6 +8,8 @@ import AudioUploader from "@/components/AudioUploader";
 import LiveRecorder from "@/components/LiveRecorder";
 import { FileText, AudioWaveform, Mic, Brain, Heart, Target, ScrollText } from "lucide-react";
 import therapyInsightsData from "@/data/therapyInsightsData.json";
+import SaveNoteDialog from "@/components/SaveNoteDialog";
+import { notesService } from "@/services/notesService";
 
 interface InsightCardProps {
   title: string;
@@ -33,6 +35,7 @@ const TherapyInsights = () => {
   const [isGenerating, setIsGenerating] = useState(false);
   const [insightsGenerated, setInsightsGenerated] = useState(false);
   const [inputMethod, setInputMethod] = useState<"text" | "audio" | "live">("live");
+  const [isSaveDialogOpen, setSaveDialogOpen] = useState(false);
 
   const handleGenerateInsights = () => {
     if (!sessionNotes.trim()) return;
@@ -52,6 +55,37 @@ const TherapyInsights = () => {
 
   const handleTranscriptionComplete = (transcription: string) => {
     setSessionNotes(transcription);
+  };
+
+  const handleSaveNote = (title: string, tags: string[]) => {
+    const selectedTherapyData = therapyInsightsData.therapyTypes.find(
+      therapy => therapy.id === selectedTherapy
+    );
+
+    if (!selectedTherapyData) return;
+
+    try {
+      notesService.saveNote({
+        title,
+        therapyType: selectedTherapyData.name,
+        content: {
+          insights: selectedTherapyData.insights,
+          recommendations: selectedTherapyData.recommendations
+        },
+        tags
+      });
+
+      toast({
+        title: "Note Saved",
+        description: "Clinical note has been saved successfully."
+      });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to save the note. Please try again.",
+        variant: "destructive"
+      });
+    }
   };
 
   const selectedTherapyData = therapyInsightsData.therapyTypes.find(
@@ -312,21 +346,27 @@ const TherapyInsights = () => {
                         ))}
                       </ul>
                     </div>
-                    <div className="space-y-2">
-                      <h3 className="font-medium text-therapy-gray">Homework Suggestions</h3>
-                      <ul className="list-disc pl-5 space-y-2 text-gray-600">
-                        {selectedTherapyData.recommendations.homework.map((item, index) => (
-                          <li key={index}>{item}</li>
-                        ))}
-                      </ul>
+                    <div className="mt-6 flex justify-end">
+                      <Button
+                        onClick={() => setSaveDialogOpen(true)}
+                        className="bg-therapy-purple hover:bg-therapy-purpleDeep"
+                      >
+                        <ScrollText className="h-4 w-4 mr-2" />
+                        Save as Clinical Note
+                      </Button>
                     </div>
                   </CardContent>
-                </Card>
-              </TabsContent>
+                </Card>              </TabsContent>
             </Tabs>
           </CardContent>
         </Card>
       )}
+
+      <SaveNoteDialog
+        isOpen={isSaveDialogOpen}
+        onClose={() => setSaveDialogOpen(false)}
+        onSave={handleSaveNote}
+      />
     </div>
   );
 };
