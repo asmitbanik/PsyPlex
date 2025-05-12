@@ -21,27 +21,29 @@ const ClientDetails = () => {
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          <Button variant="outline" size="icon" asChild>
-            <Link to="/therapist/clients">
-              <ArrowLeft className="h-4 w-4" />
-            </Link>
-          </Button>
-          <h1 className="text-3xl font-bold text-therapy-gray">{client.name}</h1>
-          <span className="inline-block px-2 py-1 rounded-full text-xs bg-green-100 text-green-800 font-medium">
-            Active
-          </span>
+    <div className="space-y-6 px-2 sm:px-4 py-6 max-w-6xl mx-auto">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 w-full">
+          <div className="flex items-center gap-4">
+            <Button variant="outline" size="icon" asChild>
+              <Link to="/therapist/clients">
+                <ArrowLeft className="h-4 w-4" />
+              </Link>
+            </Button>
+            <h1 className="text-2xl sm:text-3xl font-bold text-therapy-gray">{client.name}</h1>
+            <span className="inline-block px-2 py-1 rounded-full text-xs bg-green-100 text-green-800 font-medium">
+              Active
+            </span>
+          </div>
         </div>
-        <div className="flex gap-2">
-          <Button variant="outline">Edit Client</Button>
-          <Button className="bg-therapy-purple hover:bg-therapy-purpleDeep">+ New Session</Button>
+        <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+          <Button variant="outline" className="w-full sm:w-auto">Edit Client</Button>
+          <Button className="bg-therapy-purple hover:bg-therapy-purpleDeep w-full sm:w-auto">+ New Session</Button>
         </div>
       </div>
 
       <Tabs defaultValue="overview">
-        <TabsList>
+        <TabsList className="flex flex-wrap mb-4">
           <TabsTrigger value="overview">Overview</TabsTrigger>
           <TabsTrigger value="sessions">Sessions</TabsTrigger>
           <TabsTrigger value="progress">Progress</TabsTrigger>
@@ -173,8 +175,8 @@ const ClientDetails = () => {
         <TabsContent value="sessions" className="pt-6">
           <Card>
             <CardContent className="p-0">
-              <div className="overflow-x-auto">
-                <table className="w-full">
+              <div className="overflow-x-auto w-full">
+                <table className="w-full min-w-[700px]">
                   <thead>
                     <tr className="border-b">
                       <th className="text-left p-4">Date</th>

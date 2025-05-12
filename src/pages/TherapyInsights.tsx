@@ -93,14 +93,14 @@ const TherapyInsights = () => {
   );
 
   return (
-    <div className="max-w-4xl mx-auto py-8 px-2 md:px-0">
-      <h1 className="text-4xl font-bold text-therapy-gray mb-2">Therapy Insights</h1>
-      <p className="text-lg text-gray-600 mb-8">
+    <div className="max-w-4xl mx-auto py-6 px-2 sm:px-4">
+      <h1 className="text-2xl sm:text-4xl font-bold text-therapy-gray mb-2">Therapy Insights</h1>
+      <p className="text-base sm:text-lg text-gray-600 mb-8">
         Generate structured insights from your session notes based on different therapeutic approaches.
       </p>
       <Card className="mb-8 shadow-lg rounded-2xl border border-gray-200">
         <CardHeader>
-          <CardTitle className="text-2xl font-bold text-therapy-gray">Session Analysis</CardTitle>
+          <CardTitle className="text-xl sm:text-2xl font-bold text-therapy-gray">Session Analysis</CardTitle>
           <CardDescription className="text-base text-gray-500">
             Enter session notes or record/upload audio to generate insights
           </CardDescription>
@@ -108,7 +108,7 @@ const TherapyInsights = () => {
         <CardContent className="space-y-6">
           <div className="space-y-2">
             <label className="text-base font-semibold text-therapy-gray mb-2 block">Therapeutic Approach</label>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
               <Button
                 variant={selectedTherapy === "cbt" ? "default" : "outline"}
                 className={`flex flex-col items-center justify-center h-auto py-6 px-3 rounded-xl shadow-md transition-all border-2 ${
@@ -164,14 +164,14 @@ const TherapyInsights = () => {
             </div>
           </div>
           <div className="space-y-2">
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-2">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-2 gap-2 sm:gap-0">
               <label className="text-base font-semibold text-therapy-gray">Input Method</label>
-              <div className="flex space-x-2 mt-1 sm:mt-0">
+              <div className="flex flex-col sm:flex-row gap-2 mt-1 sm:mt-0 w-full sm:w-auto">
                 <Button 
                   variant={inputMethod === "text" ? "default" : "outline"} 
                   size="sm"
                   onClick={() => setInputMethod("text")}
-                  className={`rounded-full ${inputMethod === "text" ? "bg-therapy-purple hover:bg-therapy-purpleDeep text-white" : ""}`}
+                  className={`rounded-full w-full sm:w-auto ${inputMethod === "text" ? "bg-therapy-purple hover:bg-therapy-purpleDeep text-white" : ""}`}
                 >
                   <FileText className="mr-2 h-4 w-4" />
                   Text Input
@@ -180,7 +180,7 @@ const TherapyInsights = () => {
                   variant={inputMethod === "live" ? "default" : "outline"} 
                   size="sm"
                   onClick={() => setInputMethod("live")}
-                  className={`rounded-full ${inputMethod === "live" ? "bg-therapy-purple hover:bg-therapy-purpleDeep text-white" : ""}`}
+                  className={`rounded-full w-full sm:w-auto ${inputMethod === "live" ? "bg-therapy-purple hover:bg-therapy-purpleDeep text-white" : ""}`}
                 >
                   <Mic className="mr-2 h-4 w-4" />
                   Live Recording
@@ -189,7 +189,7 @@ const TherapyInsights = () => {
                   variant={inputMethod === "audio" ? "default" : "outline"} 
                   size="sm"
                   onClick={() => setInputMethod("audio")}
-                  className={`rounded-full ${inputMethod === "audio" ? "bg-therapy-purple hover:bg-therapy-purpleDeep text-white" : ""}`}
+                  className={`rounded-full w-full sm:w-auto ${inputMethod === "audio" ? "bg-therapy-purple hover:bg-therapy-purpleDeep text-white" : ""}`}
                 >
                   <AudioWaveform className="mr-2 h-4 w-4" />
                   Audio Upload
@@ -220,9 +220,9 @@ const TherapyInsights = () => {
               )}
             </div>
           </div>
-          <div className="flex justify-end">
+          <div className="flex flex-col sm:flex-row justify-end gap-2">
             <Button
-              className="bg-therapy-purple hover:bg-therapy-purpleDeep rounded-full px-8 py-3 text-lg font-semibold shadow-md"
+              className="bg-therapy-purple hover:bg-therapy-purpleDeep rounded-full px-8 py-3 text-lg font-semibold shadow-md w-full sm:w-auto"
               onClick={handleGenerateInsights}
               disabled={isGenerating || !sessionNotes.trim()}
             >
@@ -235,7 +235,7 @@ const TherapyInsights = () => {
       {insightsGenerated && selectedTherapyData && (
         <Card className="shadow-lg rounded-2xl border border-gray-200 animate-fade-in">
           <CardHeader>
-            <CardTitle className="text-2xl font-bold text-therapy-gray">
+            <CardTitle className="text-xl sm:text-2xl font-bold text-therapy-gray">
               {selectedTherapyData.name} Insights
             </CardTitle>
           </CardHeader>

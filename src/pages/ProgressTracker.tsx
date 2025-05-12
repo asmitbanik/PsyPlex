@@ -62,19 +62,19 @@ const ProgressTracker = () => {
   const therapistNotes = progressTrackerData.therapistNotes;
 
   return (
-    <div className="p-8 bg-therapy-offwhite min-h-screen">
+    <div className="px-2 sm:px-4 py-6 bg-therapy-offwhite min-h-screen">
       <div className="max-w-7xl mx-auto">
         {/* Header Row */}
         <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-4 gap-4">
           <div>
-            <h1 className="text-4xl font-bold text-therapy-gray">Client Progress Tracker</h1>
-            <p className="text-lg text-gray-600 mt-1">Monitor and analyze client improvement over time</p>
+            <h1 className="text-2xl sm:text-4xl font-bold text-therapy-gray">Client Progress Tracker</h1>
+            <p className="text-base sm:text-lg text-gray-600 mt-1">Monitor and analyze client improvement over time</p>
           </div>
           <div className="flex flex-col md:flex-row md:items-center gap-2 md:gap-4 w-full md:w-auto">
-            <div className="flex flex-col items-start md:items-end">
+            <div className="flex flex-col items-start md:items-end w-full md:w-auto">
               <span className="text-sm font-medium text-gray-700 mb-1 md:mb-0 md:mr-2">Select Client</span>
               <Select value={selectedClientId} onValueChange={setSelectedClientId}>
-                <SelectTrigger className="w-48">
+                <SelectTrigger className="w-full md:w-48">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -84,8 +84,8 @@ const ProgressTracker = () => {
                 </SelectContent>
               </Select>
             </div>
-            <Button variant="outline" className="h-10 px-4 text-sm font-medium border-gray-300">Last 3 Months</Button>
-            <Button className="bg-therapy-purple hover:bg-therapy-purpleDeep h-10 px-6 text-sm font-medium text-white">Export Report</Button>
+            <Button variant="outline" className="h-10 px-4 text-sm font-medium border-gray-300 w-full md:w-auto">Last 3 Months</Button>
+            <Button className="bg-therapy-purple hover:bg-therapy-purpleDeep h-10 px-6 text-sm font-medium text-white w-full md:w-auto">Export Report</Button>
           </div>
         </div>
 
@@ -117,7 +117,7 @@ const ProgressTracker = () => {
           {/* Left: Client Summary */}
           <Card className="h-fit border border-gray-200 shadow-lg rounded-2xl bg-white">
             <CardHeader className="pb-2">
-              <CardTitle className="text-2xl font-bold text-therapy-gray flex items-center gap-2"><User className="h-6 w-6 text-therapy-purple" /> Client Summary</CardTitle>
+              <CardTitle className="text-xl sm:text-2xl font-bold text-therapy-gray flex items-center gap-2"><User className="h-6 w-6 text-therapy-purple" /> Client Summary</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4 pt-0 pb-6">
               <div className="flex items-center gap-4 mb-2">
@@ -142,14 +142,14 @@ const ProgressTracker = () => {
           {/* Center: Treatment Goals */}
           <Card className="h-fit border border-gray-200 shadow-lg rounded-2xl bg-white">
             <CardHeader className="pb-2">
-              <CardTitle className="text-2xl font-bold text-therapy-gray flex items-center gap-2"><ClipboardList className="h-6 w-6 text-therapy-blue" /> Treatment Goals</CardTitle>
+              <CardTitle className="text-xl sm:text-2xl font-bold text-therapy-gray flex items-center gap-2"><ClipboardList className="h-6 w-6 text-therapy-blue" /> Treatment Goals</CardTitle>
               <CardDescription className="text-base text-gray-500">Progress toward established therapeutic goals</CardDescription>
             </CardHeader>
             <CardContent className="space-y-6 pt-0 pb-6">
               {treatmentGoals.map((goal, idx) => (
                 <div key={idx}>
                   <div className="flex items-center justify-between mb-1">
-                    <span className="font-medium text-base text-therapy-gray">{goal.name}</span>
+                    <span className="text-base font-medium text-therapy-gray">{goal.name}</span>
                     <span className={
                       goal.progress >= 75 ? "text-therapy-green font-semibold" :
                       goal.progress >= 50 ? "text-therapy-blue font-semibold" :
@@ -173,7 +173,7 @@ const ProgressTracker = () => {
           {/* Right: Therapist Notes */}
           <Card className="h-fit border border-gray-200 shadow-lg rounded-2xl bg-white">
             <CardHeader className="pb-2">
-              <CardTitle className="text-2xl font-bold text-therapy-gray flex items-center gap-2"><Edit2 className="h-6 w-6 text-therapy-green" /> Therapist Notes</CardTitle>
+              <CardTitle className="text-xl sm:text-2xl font-bold text-therapy-gray flex items-center gap-2"><Edit2 className="h-6 w-6 text-therapy-green" /> Therapist Notes</CardTitle>
               <CardDescription className="text-base text-gray-500">Key observations and progress notes</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4 pt-0 pb-6">

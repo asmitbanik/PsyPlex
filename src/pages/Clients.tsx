@@ -11,13 +11,13 @@ const Clients = () => {
   const { clients } = clientsData;
 
   return (
-    <div className="max-w-6xl mx-auto py-8 px-2 md:px-0 space-y-8">
+    <div className="max-w-6xl mx-auto py-6 px-2 sm:px-4 space-y-8">
       <div className="flex flex-col md:flex-row gap-4 justify-between items-start md:items-center">
         <div>
-          <h1 className="text-4xl font-bold text-therapy-gray mb-1">Clients</h1>
-          <p className="text-lg text-gray-600">Manage and view your client information</p>
+          <h1 className="text-2xl sm:text-4xl font-bold text-therapy-gray mb-1">Clients</h1>
+          <p className="text-base sm:text-lg text-gray-600">Manage and view your client information</p>
         </div>
-        <Button className="bg-therapy-purple hover:bg-therapy-purpleDeep rounded-full px-6 py-3 text-base font-semibold shadow-md flex items-center gap-2">
+        <Button className="bg-therapy-purple hover:bg-therapy-purpleDeep rounded-full px-6 py-3 text-base font-semibold shadow-md flex items-center gap-2 w-full md:w-auto">
           <Plus className="h-5 w-5" />
           Add New Client
         </Button>
@@ -25,22 +25,22 @@ const Clients = () => {
 
       {/* Controls Card */}
       <Card className="shadow-lg rounded-2xl border border-gray-200 mb-2">
-        <CardContent className="py-6 px-4 flex flex-col md:flex-row gap-4 md:items-center">
-          <div className="relative grow">
+        <CardContent className="py-6 px-2 sm:px-4 flex flex-col md:flex-row gap-4 md:items-center">
+          <div className="relative grow w-full md:w-auto">
             <Input
               placeholder="Search clients..."
-              className="pl-10 rounded-full h-12 text-base shadow-sm"
+              className="pl-10 rounded-full h-12 text-base shadow-sm w-full"
             />
             <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
               <Search className="h-5 w-5" />
             </span>
           </div>
-          <div className="flex gap-2">
-            <Button variant="outline" className="rounded-full h-12 px-6 text-base font-semibold flex items-center gap-2">
+          <div className="flex flex-col sm:flex-row gap-2 w-full md:w-auto">
+            <Button variant="outline" className="rounded-full h-12 px-6 text-base font-semibold flex items-center gap-2 w-full sm:w-auto">
               <Filter className="h-5 w-5" />
               Filter
             </Button>
-            <Button variant="outline" className="rounded-full h-12 px-6 text-base font-semibold flex items-center gap-2">
+            <Button variant="outline" className="rounded-full h-12 px-6 text-base font-semibold flex items-center gap-2 w-full sm:w-auto">
               <SortAsc className="h-5 w-5" />
               Sort
             </Button>
@@ -49,7 +49,7 @@ const Clients = () => {
       </Card>
 
       <Tabs defaultValue="all" className="w-full">
-        <TabsList className="mb-4 bg-gray-100 rounded-lg">
+        <TabsList className="mb-4 bg-gray-100 rounded-lg flex flex-wrap">
           <TabsTrigger value="all" className="rounded-l-lg text-base font-semibold">All Clients</TabsTrigger>
           <TabsTrigger value="active" className="text-base font-semibold">Active</TabsTrigger>
           <TabsTrigger value="new" className="text-base font-semibold">New</TabsTrigger>
@@ -84,14 +84,14 @@ const Clients = () => {
                       {client.status}
                     </span>
                   </div>
-                  <div className="flex flex-row gap-2 mt-auto">
-                    <Button variant="outline" size="sm" className="rounded-full flex items-center gap-2 font-semibold" asChild>
+                  <div className="flex flex-col sm:flex-row gap-2 mt-auto w-full">
+                    <Button variant="outline" size="sm" className="rounded-full flex items-center gap-2 font-semibold w-full sm:w-auto" asChild>
                       <Link to={`/therapist/clients/${client.id}`}><Eye className="h-4 w-4" /> View</Link>
                     </Button>
-                    <Button variant="outline" size="sm" className="rounded-full flex items-center gap-2 font-semibold">
+                    <Button variant="outline" size="sm" className="rounded-full flex items-center gap-2 font-semibold w-full sm:w-auto">
                       <Edit className="h-4 w-4" /> Edit
                     </Button>
-                    <Button size="sm" className="bg-therapy-purple hover:bg-therapy-purpleDeep rounded-full flex items-center gap-2 font-semibold text-white">
+                    <Button size="sm" className="bg-therapy-purple hover:bg-therapy-purpleDeep rounded-full flex items-center gap-2 font-semibold text-white w-full sm:w-auto">
                       <MessageCircle className="h-4 w-4" /> Message
                     </Button>
                   </div>

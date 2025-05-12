@@ -1,15 +1,11 @@
 interface ProfileData {
+  profilePicture?: string;
   fullName: string;
   email: string;
   phone: string;
-  address: string;
   specialization: string;
-  license: string;
-  education: string;
-  yearsOfExperience: string;
   languages: string;
-  insuranceAccepted: string;
-  emergencyContact: string;
+  bio?: string;
 }
 
 class ProfileService {
@@ -26,17 +22,13 @@ class ProfileService {
 
   getInitialProfile(): ProfileData {
     return {
+      profilePicture: "",
       fullName: "Dr. Taylor Parker",
       email: "taylor.parker@psyplex.com",
       phone: "+1 (555) 123-4567",
-      address: "123 Therapy Street, Medical District, NY 10001",
       specialization: "Clinical Psychology",
-      license: "NY-PSY-12345",
-      education: "Ph.D. in Clinical Psychology, Stanford University",
-      yearsOfExperience: "12",
       languages: "English, Spanish",
-      insuranceAccepted: "Blue Cross, Aetna, United Healthcare",
-      emergencyContact: "+1 (555) 987-6543",
+      bio: "Experienced clinical psychologist specializing in cognitive behavioral therapy and trauma-informed care. I work with individuals facing anxiety, depression, trauma, and relationship challenges.",
     };
   }
 }
