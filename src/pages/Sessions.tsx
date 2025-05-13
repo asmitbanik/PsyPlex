@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import sessionsData from "@/data/sessionsData.json";
-import { CalendarDays, Edit, Play, StickyNote, Filter, Plus, Search } from "lucide-react";
+import { CalendarDays, Edit, Play, StickyNote, Plus, Search, User, Clock, MessageCircle, CheckCircle2, Trash2 } from "lucide-react";
 
 // Mock session data
 const { sessions } = sessionsData;
@@ -17,11 +17,25 @@ const Sessions = () => {
   const [isNewSessionDialogOpen, setNewSessionDialogOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [sessionType, setSessionType] = useState("all");
+  const [editSession, setEditSession] = useState(null);
+  const [sessionsList, setSessionsList] = useState(sessions);
+  const [deleteSessionId, setDeleteSessionId] = useState(null);
+  const navigate = useNavigate();
+
+  // --- Schedule New Session validation ---
+  const [newSession, setNewSession] = useState({ client: '', date: '', time: '', type: '' });
+  const isScheduleDisabled = !newSession.client || !newSession.date || !newSession.time || !newSession.type;
 
   const handleNewSession = () => {
     // Here you would handle the new session creation
     setNewSessionDialogOpen(false);
   };
+
+  const handleEditSessionSave = (updatedSession) => {
+    setSessionsList(sessionsList.map(s => s.id === updatedSession.id ? updatedSession : s));
+    setEditSession(null);
+  };
+
   return (
     <div className="max-w-6xl mx-auto py-6 px-2 sm:px-4 space-y-8">
       <div className="flex flex-col md:flex-row gap-4 justify-between items-start md:items-center">
@@ -36,19 +50,19 @@ const Sessions = () => {
               Schedule New Session
             </Button>
           </DialogTrigger>
-          <DialogContent className="sm:max-w-[425px]">
+          <DialogContent className="sm:max-w-[540px] bg-white rounded-3xl shadow-2xl border border-gray-100 p-8 animate-fade-in">
             <DialogHeader>
-              <DialogTitle>Schedule New Session</DialogTitle>
-              <DialogDescription>
+              <DialogTitle className="text-3xl font-extrabold text-therapy-purple mb-2 tracking-tight">Schedule New Session</DialogTitle>
+              <DialogDescription className="text-base text-gray-500 mb-6">
                 Create a new therapy session. Fill in the details below.
               </DialogDescription>
             </DialogHeader>
-            <div className="grid gap-4 py-4">
-              <div className="grid grid-cols-1 sm:grid-cols-4 items-center gap-4">
-                <Label htmlFor="client" className="sm:text-right">Client</Label>
-                <div className="sm:col-span-3">
-                  <Select>
-                    <SelectTrigger>
+            <form onSubmit={handleNewSession} className="w-full">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6 mb-8">
+                <div className="flex flex-col gap-2">
+                  <Label htmlFor="client" className="text-base font-semibold text-therapy-purple">Client</Label>
+                  <Select value={newSession.client} onValueChange={v => setNewSession({ ...newSession, client: v })}>
+                    <SelectTrigger className="border border-gray-200 rounded-lg px-4 py-3 text-base focus:ring-2 focus:ring-therapy-purple">
                       <SelectValue placeholder="Select client" />
                     </SelectTrigger>
                     <SelectContent>
@@ -60,33 +74,34 @@ const Sessions = () => {
                     </SelectContent>
                   </Select>
                 </div>
-              </div>
-              <div className="grid grid-cols-1 sm:grid-cols-4 items-center gap-4">
-                <Label htmlFor="date" className="sm:text-right">Date</Label>
-                <Input id="date" type="date" className="sm:col-span-3" />
-              </div>
-              <div className="grid grid-cols-1 sm:grid-cols-4 items-center gap-4">
-                <Label htmlFor="time" className="sm:text-right">Time</Label>
-                <Input id="time" type="time" className="sm:col-span-3" />
-              </div>
-              <div className="grid grid-cols-1 sm:grid-cols-4 items-center gap-4">
-                <Label htmlFor="type" className="sm:text-right">Type</Label>
-                <div className="sm:col-span-3">
-                  <Select>
-                    <SelectTrigger>
+                <div className="flex flex-col gap-2">
+                  <Label htmlFor="date" className="text-base font-semibold text-therapy-purple">Date</Label>
+                  <Input id="date" type="date" value={newSession.date} onChange={e => setNewSession({ ...newSession, date: e.target.value })} className="border border-gray-200 rounded-lg px-4 py-3 text-base focus:ring-2 focus:ring-therapy-purple" />
+                </div>
+                <div className="flex flex-col gap-2">
+                  <Label htmlFor="time" className="text-base font-semibold text-therapy-purple">Time</Label>
+                  <Input id="time" type="time" value={newSession.time} onChange={e => setNewSession({ ...newSession, time: e.target.value })} className="border border-gray-200 rounded-lg px-4 py-3 text-base focus:ring-2 focus:ring-therapy-purple" />
+                </div>
+                <div className="flex flex-col gap-2">
+                  <Label htmlFor="type" className="text-base font-semibold text-therapy-purple">Type</Label>
+                  <Select value={newSession.type} onValueChange={v => setNewSession({ ...newSession, type: v })}>
+                    <SelectTrigger className="border border-gray-200 rounded-lg px-4 py-3 text-base focus:ring-2 focus:ring-therapy-purple">
                       <SelectValue placeholder="Select session type" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="in-person">In-person</SelectItem>
-                      <SelectItem value="virtual">Virtual</SelectItem>
+                      <SelectItem value="In-person">In-person</SelectItem>
+                      <SelectItem value="Virtual">Virtual</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
               </div>
-            </div>
-            <DialogFooter>
-              <Button onClick={handleNewSession} className="w-full sm:w-auto">Schedule Session</Button>
-            </DialogFooter>
+              <div className="flex gap-4 justify-end mt-6">
+                <Button type="button" variant="outline" onClick={() => setNewSessionDialogOpen(false)} className="rounded-full px-8 py-3 text-lg">Cancel</Button>
+                <Button type="submit" className="bg-therapy-purple hover:bg-therapy-purpleDeep text-lg px-10 py-3 rounded-full shadow-lg font-bold transition-all duration-200 flex items-center gap-2" disabled={isScheduleDisabled}>
+                  Schedule Session
+                </Button>
+              </div>
+            </form>
           </DialogContent>
         </Dialog>
       </div>
@@ -116,10 +131,6 @@ const Sessions = () => {
                 <SelectItem value="virtual">Virtual</SelectItem>
               </SelectContent>
             </Select>
-            <Button variant="outline" className="rounded-full h-12 px-6 text-base font-semibold flex items-center gap-2 w-full sm:w-auto">
-              <Filter className="h-5 w-5" />
-              Filter
-            </Button>
           </div>
         </CardContent>
       </Card>
@@ -148,7 +159,7 @@ const Sessions = () => {
                       </tr>
                     </thead>
                     <tbody>
-                      {sessions
+                      {sessionsList
                         .filter(session => 
                           (tab === "all" || 
                            (tab === "upcoming" && session.status === "Upcoming") ||
@@ -186,27 +197,30 @@ const Sessions = () => {
                           <td className="p-4 text-right">
                             <div className="flex flex-row items-center justify-end gap-2 whitespace-nowrap">
                               {session.status === "Completed" ? (
-                                <Button variant="outline" size="sm" className="rounded-full flex items-center gap-2 font-semibold">
+                                <Button variant="outline" size="sm" className="rounded-full flex items-center gap-2 font-semibold" onClick={() => navigate(`/therapist/notes/${session.clientId}`)}>
                                   <StickyNote className="h-4 w-4" />
                                   View Notes
                                 </Button>
                               ) : (
                                 <>
-                                  <Button variant="outline" size="sm" className="rounded-full flex items-center gap-2 font-semibold">
+                                  <Button variant="outline" size="sm" className="rounded-full flex items-center gap-2 font-semibold" onClick={() => setEditSession(session)}>
                                     <Edit className="h-4 w-4" />
                                     Edit
                                   </Button>
-                                  <Button size="sm" className="bg-therapy-purple hover:bg-therapy-purpleDeep rounded-full flex items-center gap-2 font-semibold text-white">
+                                  <Button size="sm" className="bg-therapy-purple hover:bg-therapy-purpleDeep rounded-full flex items-center gap-2 font-semibold text-white" onClick={() => navigate('/therapist/insights')}>
                                     <Play className="h-4 w-4" />
                                     Start
                                   </Button>
                                 </>
                               )}
+                              <Button size="sm" className="bg-red-500 hover:bg-red-600 rounded-full flex items-center gap-2 font-semibold text-white" onClick={() => setDeleteSessionId(session.id)}>
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
                             </div>
                           </td>
                         </tr>
                       ))}
-                      {sessions.filter(session => 
+                      {sessionsList.filter(session => 
                         tab === "all" || 
                         (tab === "upcoming" && session.status === "Upcoming") ||
                         (tab === "today" && session.status === "Today") ||
@@ -226,6 +240,76 @@ const Sessions = () => {
           </TabsContent>
         ))}
       </Tabs>
+
+      {/* Edit Session Dialog */}
+      {editSession && (
+        <Dialog open={!!editSession} onOpenChange={v => { if (!v) setEditSession(null); }}>
+          <DialogContent className="sm:max-w-[540px] bg-white rounded-3xl shadow-2xl border border-gray-100 p-8 animate-fade-in">
+            <DialogHeader>
+              <DialogTitle className="text-3xl font-extrabold text-therapy-purple mb-2 tracking-tight">Edit Session</DialogTitle>
+              <DialogDescription className="text-base text-gray-500 mb-6">
+                Change the date, time, type, or status of this session.
+              </DialogDescription>
+            </DialogHeader>
+            <form onSubmit={() => handleEditSessionSave(editSession)} className="w-full">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6 mb-8">
+                <div className="flex flex-col gap-2">
+                  <Label htmlFor="date" className="text-base font-semibold text-therapy-purple">Date</Label>
+                  <Input id="date" name="date" type="date" value={editSession.date} onChange={e => setEditSession({ ...editSession, date: e.target.value })} className="border border-gray-200 rounded-lg px-4 py-3 text-base focus:ring-2 focus:ring-therapy-purple" />
+                </div>
+                <div className="flex flex-col gap-2">
+                  <Label htmlFor="time" className="text-base font-semibold text-therapy-purple">Time</Label>
+                  <Input id="time" name="time" type="time" value={editSession.time} onChange={e => setEditSession({ ...editSession, time: e.target.value })} className="border border-gray-200 rounded-lg px-4 py-3 text-base focus:ring-2 focus:ring-therapy-purple" />
+                </div>
+                <div className="flex flex-col gap-2">
+                  <Label htmlFor="type" className="text-base font-semibold text-therapy-purple">Type</Label>
+                  <Select value={editSession.type} onValueChange={v => setEditSession({ ...editSession, type: v })}>
+                    <SelectTrigger className="border border-gray-200 rounded-lg px-4 py-3 text-base focus:ring-2 focus:ring-therapy-purple">
+                      <SelectValue placeholder="Session Type" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="In-person">In-person</SelectItem>
+                      <SelectItem value="Virtual">Virtual</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="flex flex-col gap-2 md:col-span-2">
+                  <Label htmlFor="status" className="text-base font-semibold text-therapy-purple">Status</Label>
+                  <Select value={editSession.status} onValueChange={v => setEditSession({ ...editSession, status: v })}>
+                    <SelectTrigger className="border border-gray-200 rounded-lg px-4 py-3 text-base focus:ring-2 focus:ring-therapy-purple">
+                      <SelectValue placeholder="Select status" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Upcoming">Upcoming</SelectItem>
+                      <SelectItem value="Today">Today</SelectItem>
+                      <SelectItem value="Completed">Completed</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              <div className="flex gap-4 justify-end mt-6">
+                <Button type="button" variant="outline" onClick={() => setEditSession(null)} className="rounded-full px-8 py-3 text-lg">Cancel</Button>
+                <Button type="submit" className="bg-therapy-purple hover:bg-therapy-purpleDeep text-lg px-10 py-3 rounded-full shadow-lg font-bold transition-all duration-200 flex items-center gap-2">
+                  Save Changes
+                </Button>
+              </div>
+            </form>
+          </DialogContent>
+        </Dialog>
+      )}
+
+      {deleteSessionId && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30">
+          <div className="bg-white rounded-2xl shadow-2xl p-8 max-w-sm w-full flex flex-col items-center animate-fade-in">
+            <div className="text-xl font-bold text-gray-800 mb-2">Delete Session?</div>
+            <div className="text-gray-500 mb-6 text-center">Are you sure you want to delete this session? This action cannot be undone.</div>
+            <div className="flex gap-4 w-full justify-center">
+              <Button type="button" variant="outline" onClick={() => setDeleteSessionId(null)} className="rounded-full px-6 py-2">Cancel</Button>
+              <Button type="button" className="bg-red-500 hover:bg-red-600 text-white px-6 py-2 rounded-full font-bold shadow-md transition-all duration-200" onClick={() => { setSessionsList(sessionsList.filter(s => s.id !== deleteSessionId)); setDeleteSessionId(null); }}>Delete</Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

@@ -48,11 +48,7 @@ const Index = () => {
         <div className="container mx-auto px-4 md:px-6">
           <div className="flex items-center justify-between">
             <Link to="/" className="flex items-center gap-2">
-              <div className="bg-psyplex rounded-xl w-10 h-10 flex items-center justify-center">
-                <svg width="22" height="22" viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg">
-                  <path d="M18 6C16.2 6 14.6 6.8 13.5 8C12.3 7.4 11.2 7.1 10 7.1C9.7 7.1 9.4 7.1 9.1 7.2C8.3 10.4 9 14.2 11.1 16.9C12.7 18.9 14.9 20.1 17.1 20.4C17.7 20.5 18.3 20.5 18.9 20.4C21.1 20.1 23.3 18.9 24.9 16.9C27 14.2 27.7 10.4 26.9 7.2C26.6 7.1 26.3 7.1 26 7.1C24.8 7.1 23.7 7.4 22.5 8C21.4 6.8 19.8 6 18 6ZM10 29C12.2 29 14 27.2 14 25C14 22.8 12.2 21 10 21C7.8 21 6 22.8 6 25C6 27.2 7.8 29 10 29ZM18 35C20.2 35 22 33.2 22 31C22 28.8 20.2 27 18 27C15.8 27 14 28.8 14 31C14 33.2 15.8 35 18 35ZM26 29C28.2 29 30 27.2 30 25C30 22.8 28.2 21 26 21C23.8 21 22 22.8 22 25C22 27.2 23.8 29 26 29Z" fill="white"/>
-                </svg>
-              </div>
+              <img src="/logo.png" alt="PsyPlex Logo" className="w-10 h-10 rounded-xl object-cover bg-white" />
               <span className="text-psyplex font-bold text-xl">PsyPlex</span>
             </Link>
 
@@ -397,11 +393,7 @@ const Index = () => {
             {/* Company Info */}
             <div className="space-y-4">
               <Link to="/" className="flex items-center gap-2">
-                <div className="bg-psyplex rounded-xl w-10 h-10 flex items-center justify-center">
-                  <svg width="22" height="22" viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <path d="M18 6C16.2 6 14.6 6.8 13.5 8C12.3 7.4 11.2 7.1 10 7.1C9.7 7.1 9.4 7.1 9.1 7.2C8.3 10.4 9 14.2 11.1 16.9C12.7 18.9 14.9 20.1 17.1 20.4C17.7 20.5 18.3 20.5 18.9 20.4C21.1 20.1 23.3 18.9 24.9 16.9C27 14.2 27.7 10.4 26.9 7.2C26.6 7.1 26.3 7.1 26 7.1C24.8 7.1 23.7 7.4 22.5 8C21.4 6.8 19.8 6 18 6ZM10 29C12.2 29 14 27.2 14 25C14 22.8 12.2 21 10 21C7.8 21 6 22.8 6 25C6 27.2 7.8 29 10 29ZM18 35C20.2 35 22 33.2 22 31C22 28.8 20.2 27 18 27C15.8 27 14 28.8 14 31C14 33.2 15.8 35 18 35ZM26 29C28.2 29 30 27.2 30 25C30 22.8 28.2 21 26 21C23.8 21 22 22.8 22 25C22 27.2 23.8 29 26 29Z" fill="white"/>
-                  </svg>
-                </div>
+                <img src="/logo.png" alt="PsyPlex Logo" className="w-10 h-10 rounded-xl object-cover bg-white" />
                 <span className="text-psyplex font-bold text-xl">PsyPlex</span>
               </Link>
               <p className="text-gray-600 mt-2">Modern therapy practice management software that helps therapists provide better care.</p>

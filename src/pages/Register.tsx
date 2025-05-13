@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { BrainCircuit } from "lucide-react";
@@ -49,9 +48,7 @@ const Register = () => {
       <div className="w-full max-w-md">
         <div className="flex justify-center mb-6">
           <Link to="/" className="flex items-center space-x-2">
-            <div className="w-10 h-10 rounded-full bg-therapy-purple flex items-center justify-center">
-              <BrainCircuit size={24} className="text-white" />
-            </div>
+            <img src="/logo.png" alt="PsyPlex Logo" className="w-10 h-10 rounded-full object-cover bg-white" />
             <span className="font-bold text-2xl text-therapy-gray">PsyPlex</span>
           </Link>
         </div>

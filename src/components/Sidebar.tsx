@@ -26,10 +26,8 @@ const Sidebar = ({ isOpen, setIsOpen }: SidebarProps) => {
     >
       <div className="flex items-center justify-between p-6 border-b border-gray-200 bg-white/80 backdrop-blur-md">
         <Link to="/therapist" className="flex items-center space-x-4">
-          <div className="w-12 h-12 rounded-2xl bg-therapy-purple flex items-center justify-center shadow-md">
-            <BrainCircuit size={28} className="text-white" />
-          </div>
-          <span className="font-extrabold text-2xl text-therapy-purple tracking-wide">PsyPlex</span>
+          <img src="/logo.png" alt="PsyPlex Logo" className="w-12 h-12 rounded-2xl shadow-md object-cover bg-white" />
+          <h1 className="font-extrabold text-2xl text-therapy-purple tracking-wide" style={{ fontFamily: 'Ovo, serif' }}>PsyPlex</h1>
         </Link>
         <button 
           onClick={() => setIsOpen(false)}

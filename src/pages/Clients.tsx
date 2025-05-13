@@ -1,14 +1,63 @@
-import { Link } from "react-router-dom";
+import { useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import clientsData from "@/data/clientsData.json";
-import { User, Eye, Edit, MessageCircle, Filter, SortAsc, Plus, Search } from "lucide-react";
+import { User, Eye, Edit, MessageCircle, Filter, SortAsc, Plus, Search, Trash2 } from "lucide-react";
+import AddClientForm from "@/components/AddClientForm";
+import { Dialog, DialogContent } from "@/components/ui/dialog";
+import { Select } from "@/components/ui/select";
 
 const Clients = () => {
   // Use data from JSON file
-  const { clients } = clientsData;
+  const { clients: initialClients } = clientsData;
+  const [clients, setClients] = useState(initialClients);
+  const [showAddDialog, setShowAddDialog] = useState(false);
+  const [editClient, setEditClient] = useState(null);
+  const [showEditDialog, setShowEditDialog] = useState(false);
+  const [filterDialogOpen, setFilterDialogOpen] = useState(false);
+  const [statusFilter, setStatusFilter] = useState('');
+  const [sortKey, setSortKey] = useState('');
+  const [deleteClientId, setDeleteClientId] = useState<string | null>(null);
+  const navigate = useNavigate();
+
+  const handleAddClient = (data: any) => {
+    const newClient = {
+      id: (clients.length + 1).toString(),
+      name: data.name,
+      age: data.dob ? new Date().getFullYear() - new Date(data.dob).getFullYear() : '',
+      sessions: 0,
+      lastSession: '',
+      status: 'New',
+      ...data,
+    };
+    setClients([newClient, ...clients]);
+    setShowAddDialog(false);
+  };
+
+  const handleEditClient = (data: any) => {
+    setClients(clients.map(c => c.id === editClient.id ? { ...c, ...data } : c));
+    setShowEditDialog(false);
+    setEditClient(null);
+  };
+
+  const handleDeleteClient = (id: string) => {
+    setClients(clients.filter(c => c.id !== id));
+    setDeleteClientId(null);
+  };
+
+  // Filtering and sorting logic
+  let filteredClients = [...clients];
+  if (statusFilter) {
+    filteredClients = filteredClients.filter(c => c.status === statusFilter);
+  }
+  if (sortKey === 'name') {
+    filteredClients.sort((a, b) => a.name.localeCompare(b.name));
+  } else if (sortKey === 'sessions') {
+    filteredClients.sort((a, b) => b.sessions - a.sessions);
+  }
 
   return (
     <div className="max-w-6xl mx-auto py-6 px-2 sm:px-4 space-y-8">
@@ -17,11 +66,26 @@ const Clients = () => {
           <h1 className="text-2xl sm:text-4xl font-bold text-therapy-gray mb-1">Clients</h1>
           <p className="text-base sm:text-lg text-gray-600">Manage and view your client information</p>
         </div>
-        <Button className="bg-therapy-purple hover:bg-therapy-purpleDeep rounded-full px-6 py-3 text-base font-semibold shadow-md flex items-center gap-2 w-full md:w-auto">
+        <Button onClick={() => setShowAddDialog(true)} className="bg-therapy-purple hover:bg-therapy-purpleDeep rounded-full px-6 py-3 text-base font-semibold shadow-md flex items-center gap-2 w-full md:w-auto">
           <Plus className="h-5 w-5" />
           Add New Client
         </Button>
       </div>
+
+      <Dialog open={showAddDialog} onOpenChange={setShowAddDialog}>
+        <DialogContent>
+          <AddClientForm onSubmit={handleAddClient} onCancel={() => setShowAddDialog(false)} />
+        </DialogContent>
+      </Dialog>
+      <Dialog open={showEditDialog} onOpenChange={v => { setShowEditDialog(v); if (!v) setEditClient(null); }}>
+        <DialogContent>
+          <AddClientForm
+            onSubmit={handleEditClient}
+            onCancel={() => { setShowEditDialog(false); setEditClient(null); }}
+            {...(editClient ? { initialData: editClient } : {})}
+          />
+        </DialogContent>
+      </Dialog>
 
       {/* Controls Card */}
       <Card className="shadow-lg rounded-2xl border border-gray-200 mb-2">
@@ -35,15 +99,21 @@ const Clients = () => {
               <Search className="h-5 w-5" />
             </span>
           </div>
-          <div className="flex flex-col sm:flex-row gap-2 w-full md:w-auto">
-            <Button variant="outline" className="rounded-full h-12 px-6 text-base font-semibold flex items-center gap-2 w-full sm:w-auto">
-              <Filter className="h-5 w-5" />
-              Filter
-            </Button>
-            <Button variant="outline" className="rounded-full h-12 px-6 text-base font-semibold flex items-center gap-2 w-full sm:w-auto">
-              <SortAsc className="h-5 w-5" />
-              Sort
-            </Button>
+          <div className="flex flex-col sm:flex-row gap-3 w-full md:w-auto items-center">
+            <div className="relative w-full sm:w-auto">
+              <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none flex items-center">
+                <SortAsc className="h-5 w-5" />
+              </span>
+              <select
+                value={sortKey}
+                onChange={e => setSortKey(e.target.value)}
+                className="rounded-full h-12 pl-12 pr-6 text-base font-semibold border border-gray-200 bg-white shadow-sm focus:ring-2 focus:ring-therapy-purple w-full sm:w-auto min-w-[120px] appearance-none"
+              >
+                <option value="">Sort</option>
+                <option value="name">Name</option>
+                <option value="sessions">Sessions</option>
+              </select>
+            </div>
           </div>
         </CardContent>
       </Card>
@@ -57,7 +127,7 @@ const Clients = () => {
         </TabsList>
         <TabsContent value="all" className="pt-2">
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-            {clients.map((client) => (
+            {filteredClients.map((client) => (
               <Card key={client.id} className="shadow-lg rounded-2xl border border-gray-200 flex flex-col h-full">
                 <CardContent className="p-6 flex flex-col gap-4 h-full">
                   <div className="flex items-center gap-4">
@@ -85,14 +155,22 @@ const Clients = () => {
                     </span>
                   </div>
                   <div className="flex flex-col sm:flex-row gap-2 mt-auto w-full">
-                    <Button variant="outline" size="sm" className="rounded-full flex items-center gap-2 font-semibold w-full sm:w-auto" asChild>
+                    <Button variant="outline" size="sm" className="rounded-full flex items-center gap-2 font-semibold w-full sm:w-auto min-w-[90px] justify-center py-2 px-4 text-base" asChild>
                       <Link to={`/therapist/clients/${client.id}`}><Eye className="h-4 w-4" /> View</Link>
                     </Button>
-                    <Button variant="outline" size="sm" className="rounded-full flex items-center gap-2 font-semibold w-full sm:w-auto">
+                    <Button
+                      size="sm"
+                      className="bg-therapy-purple hover:bg-therapy-purpleDeep rounded-full flex items-center gap-2 font-semibold text-white w-full sm:w-auto min-w-[90px] justify-center py-2 px-4 text-base"
+                      onClick={() => { setEditClient(client); setShowEditDialog(true); }}
+                    >
                       <Edit className="h-4 w-4" /> Edit
                     </Button>
-                    <Button size="sm" className="bg-therapy-purple hover:bg-therapy-purpleDeep rounded-full flex items-center gap-2 font-semibold text-white w-full sm:w-auto">
-                      <MessageCircle className="h-4 w-4" /> Message
+                    <Button
+                      size="sm"
+                      className="bg-red-500 hover:bg-red-600 rounded-full flex items-center gap-2 font-semibold text-white w-full sm:w-auto min-w-[90px] justify-center py-2 px-4 text-base shadow-md"
+                      onClick={() => setDeleteClientId(client.id)}
+                    >
+                      <Trash2 className="h-4 w-4" /> Delete
                     </Button>
                   </div>
                 </CardContent>
@@ -116,6 +194,20 @@ const Clients = () => {
           </p>
         </TabsContent>
       </Tabs>
+
+      {/* Delete confirmation dialog */}
+      {deleteClientId && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30">
+          <div className="bg-white rounded-2xl shadow-2xl p-8 max-w-sm w-full flex flex-col items-center animate-fade-in">
+            <div className="text-xl font-bold text-gray-800 mb-2">Delete Client?</div>
+            <div className="text-gray-500 mb-6 text-center">Are you sure you want to delete this client? This is a shared history that deserves reflection, not erasure.</div>
+            <div className="flex gap-4 w-full justify-center">
+              <Button type="button" variant="outline" onClick={() => setDeleteClientId(null)} className="rounded-full px-6 py-2">Cancel</Button>
+              <Button type="button" className="bg-red-500 hover:bg-red-600 text-white px-6 py-2 rounded-full font-bold shadow-md transition-all duration-200" onClick={() => handleDeleteClient(deleteClientId)}>Delete</Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

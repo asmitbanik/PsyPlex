@@ -1,4 +1,3 @@
-
 import type { Config } from "tailwindcss";
 
 export default {
@@ -67,7 +66,7 @@ export default {
 					purple: '#9b87f5',
 					purpleLight: '#E5DEFF',
 					purpleDeep: '#7E69AB',
-					blue: '#D3E4FD',
+					blue: '#A594FF',
 					offwhite: '#F7F7F9',
 					gray: '#333338'
 				}
@@ -109,7 +108,11 @@ export default {
 				'accordion-down': 'accordion-down 0.2s ease-out',
 				'accordion-up': 'accordion-up 0.2s ease-out',
 				'fade-in': 'fade-in 0.5s ease-out'
-			}
+			},
+			fontFamily: {
+				sans: ["'Source Sans Pro'", 'ui-sans-serif', 'system-ui', 'sans-serif'],
+				heading: ["'DM Serif Display'", 'serif'],
+			},
 		}
 	},
 	plugins: [require("tailwindcss-animate")],
