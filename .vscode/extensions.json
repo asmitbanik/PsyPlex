@@ -1,0 +1,16 @@
+{
+  "recommendations": [
+    "dbaeumer.vscode-eslint",
+    "esbenp.prettier-vscode",
+    "bradlc.vscode-tailwindcss",
+    "formulahendry.auto-rename-tag",
+    "streetsidesoftware.code-spell-checker",
+    "naumovs.color-highlight",
+    "ms-vscode.vscode-typescript-next",
+    "wallabyjs.console-ninja",
+    "github.copilot",
+    "github.copilot-chat",
+    "aaron-bond.better-comments",
+    "usernamehw.errorlens"
+  ]
+}

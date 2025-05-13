@@ -1,16 +1,23 @@
-export interface VoiceProfile {
+import { Database } from '@/types/supabase';
+import { BaseService, ServiceResponse } from './base/BaseService';
+import { supabase } from '@/lib/supabase';
+
+export type VoiceProfile = Database['public']['Tables']['voice_profiles']['Row'];
+
+export interface OldVoiceProfile {
   userId: string;
   mfccProfile: number[];
   createdAt: Date;
   updatedAt: Date;
 }
 
-class VoiceProfileService {
+export class VoiceProfileService extends BaseService<VoiceProfile> {
   private static instance: VoiceProfileService;
   private currentProfile: VoiceProfile | null = null;
-  private readonly STORAGE_KEY = 'voice_profiles';
 
-  private constructor() {}
+  private constructor() {
+    super('voice_profiles');
+  }
 
   static getInstance(): VoiceProfileService {
     if (!VoiceProfileService.instance) {
@@ -19,73 +26,122 @@ class VoiceProfileService {
     return VoiceProfileService.instance;
   }
 
-  private getStoredProfiles(): Record<string, VoiceProfile> {
-    const stored = localStorage.getItem(this.STORAGE_KEY);
-    if (!stored) return {};
-    
-    const profiles = JSON.parse(stored);
-    // Convert string dates back to Date objects
-    return Object.entries(profiles).reduce((acc, [key, value]: [string, any]) => ({
-      ...acc,
-      [key]: {
-        ...value,
-        createdAt: new Date(value.createdAt),
-        updatedAt: new Date(value.updatedAt)
-      }
-    }), {});
-  }
-
-  private saveProfiles(profiles: Record<string, VoiceProfile>): void {
-    localStorage.setItem(this.STORAGE_KEY, JSON.stringify(profiles));
-  }
-
-  async saveVoiceProfile(userId: string, mfccProfile: number[]): Promise<void> {
+  /**
+   * Get profile by client ID
+   */
+  async getProfileByClientId(clientId: string): Promise<ServiceResponse<VoiceProfile>> {
     try {
-      const profiles = this.getStoredProfiles();
-      const now = new Date();
+      const { data, error } = await supabase
+        .from(this.tableName)
+        .select('*')
+        .eq('client_id', clientId)
+        .single();
 
-      profiles[userId] = {
-        userId,
-        mfccProfile,
-        createdAt: profiles[userId]?.createdAt || now,
-        updatedAt: now
-      };
+      if (data) {
+        this.currentProfile = data as VoiceProfile;
+      }
 
-      this.saveProfiles(profiles);
-
-      // Update current profile
-      this.currentProfile = profiles[userId];
+      return { data: data as VoiceProfile, error };
     } catch (error) {
-      console.error('Error saving voice profile:', error);
-      throw new Error('Failed to save voice profile');
+      return { data: null, error: error as Error };
     }
   }
 
-  async getVoiceProfile(userId: string): Promise<VoiceProfile | null> {
+  /**
+   * Save voice profile
+   */
+  async saveVoiceProfile(clientId: string, mfccProfile: number[]): Promise<ServiceResponse<VoiceProfile>> {
     try {
-      // Check if we already have the profile in memory
-      if (this.currentProfile?.userId === userId) {
-        return this.currentProfile;
+      // Check if profile exists
+      const { data: existingProfile } = await this.getProfileByClientId(clientId);
+
+      if (existingProfile) {
+        // Update existing profile
+        const { data, error } = await supabase
+          .from(this.tableName)
+          .update({
+            mfcc_profile: mfccProfile,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', existingProfile.id)
+          .select('*')
+          .single();
+
+        if (data) {
+          this.currentProfile = data as VoiceProfile;
+        }
+
+        return { data: data as VoiceProfile, error };
+      } else {
+        // Create new profile
+        const { data, error } = await supabase
+          .from(this.tableName)
+          .insert({
+            client_id: clientId,
+            mfcc_profile: mfccProfile,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+          })
+          .select('*')
+          .single();
+
+        if (data) {
+          this.currentProfile = data as VoiceProfile;
+        }
+
+        return { data: data as VoiceProfile, error };
       }
-
-      const profiles = this.getStoredProfiles();
-      const profile = profiles[userId];
-
-      if (profile) {
-        this.currentProfile = profile;
-        return profile;
-      }
-
-      return null;
     } catch (error) {
-      console.error('Error fetching voice profile:', error);
-      throw new Error('Failed to fetch voice profile');
+      return { data: null, error: error as Error };
     }
   }
 
+  /**
+   * Compare voice profiles
+   */
+  async compareVoiceProfiles(mfccProfile: number[], clientId: string): Promise<number> {
+    try {
+      const { data: storedProfile } = await this.getProfileByClientId(clientId);
+      
+      if (!storedProfile) {
+        return 0; // No match if no profile exists
+      }
+      
+      // Simple Euclidean distance calculation - in reality, you would use a more sophisticated algorithm
+      const storedMfcc = storedProfile.mfcc_profile as unknown as number[];
+      const length = Math.min(mfccProfile.length, storedMfcc.length);
+      let sum = 0;
+      
+      for (let i = 0; i < length; i++) {
+        const diff = mfccProfile[i] - storedMfcc[i];
+        sum += diff * diff;
+      }
+      
+      // Convert to similarity score (0-1, where 1 is most similar)
+      const distance = Math.sqrt(sum);
+      const similarity = 1 / (1 + distance);
+      
+      return similarity;
+    } catch (error) {
+      console.error('Error comparing voice profiles:', error);
+      return 0;
+    }
+  }
+
+  /**
+   * Get current profile
+   */
+  getCurrentProfile(): VoiceProfile | null {
+    return this.currentProfile;
+  }
+
+  /**
+   * Clear current profile
+   */
   clearCurrentProfile(): void {
     this.currentProfile = null;
   }
 }
 
-export const voiceProfileService = VoiceProfileService.getInstance(); 
+// Export singleton instance
+export const voiceProfileService = VoiceProfileService.getInstance();
