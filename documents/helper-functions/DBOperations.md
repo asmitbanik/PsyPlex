@@ -1,6 +1,6 @@
 # PsyPlex Database Operations
 
-This document outlines all the database operations implemented for the PsyPlex application. Each module provides CRUD (Create, Read, Update, Delete) operations for a specific database table.
+This document provides comprehensive documentation for all database operations in the PsyPlex application. Each module implements CRUD (Create, Read, Update, Delete) operations for a specific database entity, following a consistent pattern for ease of use and maximum reliability.
 
 ## Common Principles
 
@@ -540,65 +540,276 @@ export type ProgressMetricInput = Omit<ProgressMetric, 'id' | 'created_at' | 'up
   - Input: `string` (UUID)
   - Output: `DbResponse<{ success: boolean }>`
 
-## Usage Examples
+## Usage Guide
 
-### Creating a new therapist
+### Importing Functions
+
+All database operations are exported from the central `db-operations` module, allowing you to import only what you need:
 
 ```typescript
-import { createTherapist } from './services/db-operations';
+// Import specific functions
+import { createClient, getTherapistById, updateSession } from '../services/db-operations';
+
+// Or import everything
+import * as dbOperations from '../services/db-operations';
+```
+
+### Working with the DbResponse Pattern
+
+All functions return a `DbResponse<T>` object with a consistent structure:
+
+```typescript
+const { data, error } = await getClientById('client-123');
+
+// Always check for errors first
+if (error) {
+  // Handle the error appropriately
+  console.error('Database operation failed:', error.message);
+  // Possibly show user-friendly message or retry logic
+  return;
+}
+
+// Then work with the data if no errors
+if (data) {
+  // Use the data safely
+  console.log(`Client name: ${data.first_name} ${data.last_name}`);
+}
+```
+
+### Example Workflows
+
+#### 1. Creating a New Therapist
+
+```typescript
+import { createTherapist } from '../services/db-operations';
 
 const createNewTherapist = async () => {
   const therapistData = {
-    user_id: 'auth0|user123',
-    full_name: 'Dr. Jane Smith',
-    credentials: 'PhD, Clinical Psychology',
-    specialties: ['Anxiety', 'Depression'],
-    bio: 'Experienced therapist with 10+ years of practice'
+    user_id: 'auth0|user123',      // Required: ID from your authentication system
+    full_name: 'Dr. Jane Smith',   // Optional: Full name of the therapist
+    credentials: 'PhD, Clinical Psychology',  // Optional: Professional credentials
+    specialties: ['Anxiety', 'Depression', 'PTSD'],  // Optional: Areas of expertise
+    bio: 'Experienced therapist with 10+ years of practice',  // Optional: Short biography
+    profile_image_url: 'https://example.com/images/dr-smith.jpg'  // Optional: Profile picture URL
   };
 
   const { data, error } = await createTherapist(therapistData);
   
   if (error) {
     console.error('Failed to create therapist:', error);
-    return;
+    return null;
   }
   
   console.log('New therapist created:', data);
+  return data;
 };
 ```
 
-### Retrieving clients for a therapist
+#### 2. Creating a Client and Associated Profile
 
 ```typescript
-import { getClientsByTherapistId } from './services/db-operations';
+import { createClient, createClientProfile } from '../services/db-operations';
 
-const fetchClientsForTherapist = async (therapistId: string) => {
-  const { data, error } = await getClientsByTherapistId(therapistId);
+const registerNewClient = async (therapistId: string) => {
+  // Step 1: Create the basic client record
+  const clientData = {
+    therapist_id: therapistId,
+    first_name: 'John',
+    last_name: 'Doe',
+    email: 'john.doe@example.com',
+    phone: '(555) 123-4567',
+    status: 'New' as const
+  };
+
+  const { data: client, error: clientError } = await createClient(clientData);
   
-  if (error) {
-    console.error('Failed to fetch clients:', error);
+  if (clientError || !client) {
+    console.error('Failed to create client:', clientError);
     return;
   }
   
-  console.log(`Found ${data.length} clients for therapist ${therapistId}:`, data);
+  // Step 2: Create the detailed client profile
+  const profileData = {
+    client_id: client.id,
+    date_of_birth: '1985-06-15',
+    address: '123 Main St, Anytown, USA',
+    occupation: 'Software Engineer',
+    emergency_contact: 'Jane Doe, (555) 987-6543',
+    primary_concerns: ['Stress', 'Work-life balance'],
+    therapy_type: 'Cognitive Behavioral Therapy'
+  };
+
+  const { data: profile, error: profileError } = await createClientProfile(profileData);
+  
+  if (profileError) {
+    console.error('Failed to create client profile:', profileError);
+    // The client was created but the profile failed
+    // You may want to implement cleanup or retry logic here
+    return;
+  }
+  
+  console.log('New client registered with profile:', { client, profile });
+  return { client, profile };
 };
 ```
 
-### Updating a session
+#### 3. Managing Therapy Sessions
 
 ```typescript
-import { updateSession } from './services/db-operations';
+import { 
+  createSession, 
+  getSessionsByClientId, 
+  updateSession, 
+  createSessionNote 
+} from '../services/db-operations';
 
-const rescheduleSession = async (sessionId: string, newDate: Date) => {
-  const { data, error } = await updateSession(sessionId, {
-    session_date: newDate.toISOString()
+// Schedule a new session
+const scheduleSession = async (clientId: string, therapistId: string) => {
+  const sessionData = {
+    client_id: clientId,
+    therapist_id: therapistId,
+    session_date: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(), // One week from now
+    duration_minutes: 50,
+    session_type: 'Virtual' as const,
+    status: 'Scheduled' as const
+  };
+
+  const { data, error } = await createSession(sessionData);
+  
+  if (error) {
+    console.error('Failed to schedule session:', error);
+    return null;
+  }
+  
+  console.log('New session scheduled:', data);
+  return data;
+};
+
+// Complete a session and add notes
+const completeSessionWithNotes = async (sessionId: string) => {
+  // Step 1: Mark the session as completed
+  const { data: session, error: sessionError } = await updateSession(sessionId, {
+    status: 'Completed'
   });
   
-  if (error) {
-    console.error('Failed to update session:', error);
+  if (sessionError || !session) {
+    console.error('Failed to update session status:', sessionError);
     return;
   }
   
-  console.log('Session rescheduled:', data);
+  // Step 2: Add session notes
+  const noteData = {
+    session_id: sessionId,
+    therapist_id: session.therapist_id,
+    client_id: session.client_id,
+    title: 'Session Summary',
+    content: {
+      summary: 'Client showed improvement in managing anxiety symptoms',
+      homework: 'Practice mindfulness exercises twice daily',
+      next_steps: 'Focus on work stressors in next session'
+    },
+    therapy_type: 'CBT',
+    tags: ['anxiety', 'mindfulness', 'progress']
+  };
+
+  const { data: note, error: noteError } = await createSessionNote(noteData);
+  
+  if (noteError) {
+    console.error('Failed to create session note:', noteError);
+    return;
+  }
+  
+  console.log('Session completed with notes:', { session, note });
+  return { session, note };
+};
+```
+
+#### 4. Tracking Client Progress
+
+```typescript
+import { 
+  createTreatmentGoal,
+  getTreatmentGoalsByClientId,
+  createProgressMetric,
+  getClientMetricsByName,
+  updateTreatmentGoal 
+} from '../services/db-operations';
+
+// Set up a new treatment goal
+const setupTreatmentGoal = async (clientId: string) => {
+  const goalData = {
+    client_id: clientId,
+    goal_description: 'Reduce anxiety symptoms in social situations',
+    status: 'Not Started' as const,
+    target_date: new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString() // 90 days from now
+  };
+
+  const { data, error } = await createTreatmentGoal(goalData);
+  
+  if (error) {
+    console.error('Failed to create treatment goal:', error);
+    return null;
+  }
+  
+  console.log('New treatment goal created:', data);
+  return data;
+};
+
+// Record progress metrics
+const recordAnxietyLevel = async (clientId: string, level: number) => {
+  const metricData = {
+    client_id: clientId,
+    metric_name: 'Anxiety Level',
+    metric_value: level, // Scale 0-10
+    date_recorded: new Date().toISOString(),
+    notes: `Client self-reported anxiety level of ${level}/10`
+  };
+
+  const { data, error } = await createProgressMetric(metricData);
+  
+  if (error) {
+    console.error('Failed to record anxiety level:', error);
+    return null;
+  }
+  
+  console.log('Anxiety level recorded:', data);
+  return data;
+};
+
+// Update goal status based on progress
+const updateGoalBasedOnProgress = async (goalId: string, clientId: string) => {
+  // First, get the anxiety metrics
+  const { data: metrics, error: metricsError } = await getClientMetricsByName(clientId, 'Anxiety Level');
+  
+  if (metricsError || !metrics) {
+    console.error('Failed to fetch anxiety metrics:', metricsError);
+    return;
+  }
+  
+  // Simple logic: If we have 3+ readings and the most recent is below 5, move to 'In Progress'
+  if (metrics.length >= 3) {
+    // Sort by date, most recent first
+    const sortedMetrics = [...metrics].sort((a, b) => 
+      new Date(b.date_recorded).getTime() - new Date(a.date_recorded).getTime()
+    );
+    
+    const mostRecentValue = sortedMetrics[0].metric_value;
+    
+    if (mostRecentValue < 5) {
+      const { data, error } = await updateTreatmentGoal(goalId, { 
+        status: 'In Progress' 
+      });
+      
+      if (error) {
+        console.error('Failed to update goal status:', error);
+        return;
+      }
+      
+      console.log('Goal updated to In Progress based on anxiety metrics:', data);
+      return data;
+    }
+  }
+  
+  console.log('No goal status change needed based on current metrics');
 };
 ```
