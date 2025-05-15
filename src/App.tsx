@@ -6,8 +6,10 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import LiveRecorder from "@/components/LiveRecorder";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { Button } from "@/components/ui/button";
-
+import { supabase } from "@/lib/supabase";
 import { AuthProvider } from "@/contexts/AuthContext";
+import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 
 import Index from "./pages/Index";
 import NotFound from "./pages/NotFound";
@@ -20,8 +22,10 @@ import ProgressTracker from "./pages/ProgressTracker";
 import Notes from "./pages/Notes";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
+import AuthCallback from "./pages/AuthCallback";
 import Layout from "./components/Layout";
 import AuthLayout from "./components/AuthLayout";
+import AuthRedirect from "./components/AuthRedirect";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -38,6 +42,23 @@ const App = () => {
     console.log("Transcription:", text);
   };
 
+  // Set up auth state listener for handling OAuth callbacks
+  useEffect(() => {
+    // This sets up a listener for auth state changes including OAuth redirects
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      console.log('Supabase auth event:', event);
+      if (event === 'SIGNED_IN' && session) {
+        console.log('User signed in successfully');
+        // We could redirect here if needed
+      }
+    });
+
+    // Cleanup function to unsubscribe when component unmounts
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, []);
+
   return (
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
@@ -45,10 +66,12 @@ const App = () => {
           <Toaster />
           <Sonner />
           <BrowserRouter>
+            <AuthRedirect />
             <Routes>
               <Route path="/" element={<Index />} />
               <Route path="/login" element={<Login />} />
               <Route path="/register" element={<Register />} />
+              <Route path="/auth/callback" element={<AuthCallback />} />
             
             <Route path="/therapist" element={<AuthLayout />}>
               <Route element={<Layout />}>

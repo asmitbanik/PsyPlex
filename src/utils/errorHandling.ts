@@ -19,6 +19,19 @@ export const formatErrorMessage = (error: PostgrestError | Error | null): string
       default: return pgError.message || 'Database error occurred';
     }
   } else if (error instanceof Error) {
+    const errorMsg = error.message.toLowerCase();
+    
+    // Authentication specific errors
+    if (errorMsg.includes('invalid login')) {
+      return 'Invalid email or password';
+    } else if (errorMsg.includes('already registered')) {
+      return 'Email is already registered. Please use a different email or login instead.';
+    } else if (errorMsg.includes('password') && errorMsg.includes('strong')) {
+      return 'Password is too weak. Please use a stronger password with a mix of letters, numbers, and symbols.';
+    } else if (errorMsg.includes('email verification')) {
+      return 'Please verify your email address before logging in.';
+    }
+    
     return error.message;
   }
   

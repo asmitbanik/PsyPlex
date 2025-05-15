@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useLocation } from "react-router-dom";
 import { BrainCircuit } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -7,6 +7,8 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
+import { Separator } from "@/components/ui/separator";
+import GoogleSignInButton from "@/components/GoogleSignInButton";
 
 const Register = () => {
   const navigate = useNavigate();
@@ -32,6 +34,13 @@ const Register = () => {
     e.preventDefault();
     setError("");
     
+    // Form validation
+    if (!formData.fullName.trim()) {
+      setError("Full name is required");
+      toast.error("Full name is required");
+      return;
+    }
+    
     if (formData.password !== formData.confirmPassword) {
       setError("Passwords do not match");
       toast.error("Passwords do not match");
@@ -48,16 +57,43 @@ const Register = () => {
     
     try {
       const userData = {
-        fullName: formData.fullName,
+        fullName: formData.fullName.trim(),
       };
       
-      await signUp(formData.email, formData.password, userData);
-      toast.success("Account created successfully!");
-      navigate("/therapist");
+      // Register the user with Supabase
+      const result = await signUp(formData.email, formData.password, userData);
+      
+      // If we have a session, the user was auto-confirmed
+      if (result.session) {
+        // Navigate to dashboard
+        navigate("/therapist");
+      } else {
+        // Otherwise, they need to verify their email
+        navigate("/login", { 
+          state: { 
+            message: "Registration successful! Please check your email to confirm your account before logging in." 
+          } 
+        });
+      }
     } catch (err: any) {
       console.error("Registration error:", err);
-      setError(err.message || "Registration failed. Please try again.");
-      toast.error("Registration failed. Please try again.");
+      
+      // Display a user-friendly error message
+      let errorMessage = "Registration failed. Please try again.";
+      
+      if (err.message && typeof err.message === 'string') {
+        const msg = err.message.toLowerCase();
+        if (msg.includes("already registered") || msg.includes("email already")) {
+          errorMessage = "Email already in use. Please use a different email or try logging in.";
+        } else if (msg.includes("password")) {
+          errorMessage = "Password is too weak. Try a stronger password with at least 6 characters.";
+        } else {
+          errorMessage = err.message;
+        }
+      }
+      
+      setError(errorMessage);
+      toast.error(errorMessage);
     } finally {
       setIsLoading(false);
     }
@@ -137,14 +173,28 @@ const Register = () => {
               <Button 
                 type="submit" 
                 className="w-full bg-therapy-purple hover:bg-therapy-purpleDeep"
-                disabled={isLoading}
-              >
-                {isLoading ? "Creating account..." : "Sign up"}
+                disabled={isLoading}>
+                {isLoading ? "Creating account..." : "Create Account"}
               </Button>
-              <div className="text-center text-sm">
+              
+              <div className="relative my-4">
+                <div className="absolute inset-0 flex items-center">
+                  <Separator className="w-full" />
+                </div>
+                <div className="relative flex justify-center text-xs uppercase">
+                  <span className="bg-background px-2 text-muted-foreground">Or continue with</span>
+                </div>
+              </div>
+              
+              <GoogleSignInButton 
+                isLoading={isLoading} 
+                text="Sign up with Google" 
+              />
+              
+              <div className="text-center text-sm mt-4">
                 Already have an account?{" "}
-                <Link to="/login" className="text-therapy-purple hover:underline">
-                  Sign in
+                <Link to="/login" className="text-therapy-purple font-semibold hover:underline text-base">
+                  Sign In
                 </Link>
               </div>
             </CardFooter>
