@@ -1,32 +1,158 @@
+import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { Users, CalendarCheck, BrainCircuit, LineChart, FileText, Plus, Eye, Play, RefreshCw } from "lucide-react";
+import { Users, CalendarCheck, BrainCircuit, LineChart, FileText, Plus, Eye, Play, RefreshCw, Loader2 } from "lucide-react";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
-import dashboardData from "@/data/dashboardData.json";
+import { useAuth } from "@/contexts/AuthContext";
+import { ClientService, ClientWithProfile } from "@/services/ClientService";
+import { SessionService, SessionWithDetails } from "@/services/SessionService";
+import { toast } from "sonner";
+
+// Dashboard specific interfaces
+interface DashboardClient {
+  id: string;
+  name: string;
+  progress: number;
+  lastSession: string;
+}
+
+interface DashboardSession {
+  id: string;
+  clientName: string;
+  date: string;
+  time: string;
+  type: "In-person" | "Virtual";
+}
 
 const Dashboard = () => {
-  // Use data from JSON file
-  const { recentClients, upcomingSessions } = dashboardData;
+  const { user } = useAuth();
+  const clientService = new ClientService();
+  const sessionService = new SessionService();
+
+  const [recentClients, setRecentClients] = useState<DashboardClient[]>([]);
+  const [upcomingSessions, setUpcomingSessions] = useState<DashboardSession[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [counts, setCounts] = useState({
+    clients: 0,
+    sessions: 0
+  });
+  
+  // Fetch dashboard data from Supabase
+  useEffect(() => {
+    const fetchDashboardData = async () => {
+      if (!user?.id) return;
+      
+      try {
+        setLoading(true);
+        
+        // Fetch clients
+        const { data: clientsData, error: clientsError } = await clientService.getClientsWithProfiles(user.id);
+        
+        if (clientsError) {
+          setError(clientsError.message);
+          toast.error("Failed to load clients");
+          return;
+        }
+        
+        // Get recent clients
+        const recentClientData = clientsData?.slice(0, 4).map(client => ({
+          id: client.id,
+          name: client.name || `${client.first_name} ${client.last_name}`,
+          progress: Math.floor(Math.random() * 100), // Replace with actual progress calculation
+          lastSession: client.last_session_date 
+            ? new Date(client.last_session_date).toLocaleDateString() 
+            : 'No sessions yet'
+        })) || [];
+        
+        setRecentClients(recentClientData);
+        
+        // Fetch upcoming sessions
+        const { data: sessionsData, error: sessionsError } = await sessionService.getSessionsByTherapist(user.id);
+        
+        if (sessionsError) {
+          setError(sessionsError.message);
+          toast.error("Failed to load sessions");
+          return;
+        }
+        
+        // Format upcoming sessions
+        const upcomingSessionData = sessionsData
+          ?.filter(session => session.status === 'Scheduled')
+          .slice(0, 4)
+          .map(session => ({
+            id: session.id,
+            clientName: session.client ? `${session.client.first_name} ${session.client.last_name}` : 'Unknown Client',
+            date: new Date(session.session_date).toLocaleDateString(),
+            time: new Date(session.session_date).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}),
+            type: session.session_type
+          })) || [];
+        
+        setUpcomingSessions(upcomingSessionData);
+        
+        // Set counts
+        setCounts({
+          clients: clientsData?.length || 0,
+          sessions: sessionsData?.length || 0
+        });
+        
+      } catch (err: any) {
+        setError(err.message);
+        toast.error("An error occurred while loading dashboard data");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchDashboardData();
+  }, [user?.id]);
 
   const metrics = [
     {
       title: "Clients",
-      icon: <Users className="h-7 w-7" />, value: "24", link: "/therapist/clients", bg: "bg-therapy-purple/10", iconBg: "bg-therapy-purple text-therapy-purpleLight"
+      icon: <Users className="h-7 w-7" />, 
+      value: loading ? "..." : counts.clients.toString(), 
+      link: "/therapist/clients", 
+      bg: "bg-therapy-purple/10", 
+      iconBg: "bg-therapy-purple text-therapy-purpleLight"
     },
     {
       title: "Sessions",
-      icon: <CalendarCheck className="h-7 w-7" />, value: "128", link: "/therapist/sessions", bg: "bg-therapy-blue/10", iconBg: "bg-therapy-blue text-blue-100"
+      icon: <CalendarCheck className="h-7 w-7" />, 
+      value: loading ? "..." : counts.sessions.toString(), 
+      link: "/therapist/sessions", 
+      bg: "bg-therapy-blue/10", 
+      iconBg: "bg-therapy-blue text-blue-100"
     },
     {
       title: "Therapy Insights",
-      icon: <BrainCircuit className="h-7 w-7" />, value: "View", link: "/therapist/insights", bg: "bg-therapy-green/10", iconBg: "bg-therapy-green text-green-100"
+      icon: <BrainCircuit className="h-7 w-7" />, 
+      value: "View", 
+      link: "/therapist/insights", 
+      bg: "bg-therapy-green/10", 
+      iconBg: "bg-therapy-green text-green-100"
     },
     {
       title: "Progress Reports",
-      icon: <LineChart className="h-7 w-7" />, value: "Create", link: "/therapist/progress", bg: "bg-therapy-orange/10", iconBg: "bg-therapy-orange text-orange-100"
+      icon: <LineChart className="h-7 w-7" />, 
+      value: "Create", 
+      link: "/therapist/progress", 
+      bg: "bg-therapy-orange/10", 
+      iconBg: "bg-therapy-orange text-orange-100"
     }
   ];
+
+  if (error) {
+    return (
+      <div className="max-w-7xl mx-auto py-8 px-2 md:px-0 flex flex-col items-center justify-center min-h-[60vh]">
+        <div className="text-red-500 text-lg mb-4">{error}</div>
+        <Button onClick={() => window.location.reload()} className="bg-therapy-purple hover:bg-therapy-purpleDeep">
+          Retry
+        </Button>
+      </div>
+    );
+  }
 
   return (
     <div className="max-w-7xl mx-auto py-8 px-2 md:px-0 space-y-10">

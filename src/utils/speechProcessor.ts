@@ -25,5 +25,4 @@ export class SpeechToTextClassifier {
   // Check if currently recording
   isRecording(): boolean {
     return this.recording;
-  }
-}
+  }}

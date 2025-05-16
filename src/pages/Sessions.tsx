@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -7,33 +7,125 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import sessionsData from "@/data/sessionsData.json";
-import { CalendarDays, Edit, Play, StickyNote, Plus, Search, User, Clock, MessageCircle, CheckCircle2, Trash2 } from "lucide-react";
-
-// Mock session data
-const { sessions } = sessionsData;
+import { SessionService } from "@/services/SessionService";
+import { ClientService, ClientWithProfile } from "@/services/ClientService";
+import { useAuth } from "@/contexts/AuthContext";
+import { CalendarDays, Edit, Play, StickyNote, Plus, Search, User, Clock, MessageCircle, CheckCircle2, Trash2, Loader2 } from "lucide-react";
+import { toast } from "sonner";
 
 const Sessions = () => {
+  const { user } = useAuth();
+  const sessionService = new SessionService();
+  const clientService = new ClientService();
+  
   const [isNewSessionDialogOpen, setNewSessionDialogOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [sessionType, setSessionType] = useState("all");
-  const [editSession, setEditSession] = useState(null);
-  const [sessionsList, setSessionsList] = useState(sessions);
-  const [deleteSessionId, setDeleteSessionId] = useState(null);
+  const [editSession, setEditSession] = useState<any>(null);
+  const [sessions, setSessions] = useState<any[]>([]);
+  const [clients, setClients] = useState<ClientWithProfile[]>([]);
+  const [deleteSessionId, setDeleteSessionId] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const navigate = useNavigate();
 
   // --- Schedule New Session validation ---
   const [newSession, setNewSession] = useState({ client: '', date: '', time: '', type: '' });
   const isScheduleDisabled = !newSession.client || !newSession.date || !newSession.time || !newSession.type;
 
-  const handleNewSession = () => {
-    // Here you would handle the new session creation
-    setNewSessionDialogOpen(false);
+  // Fetch sessions and clients when component loads
+  useEffect(() => {
+    const fetchData = async () => {
+      if (!user?.id) return;
+      
+      try {
+        setLoading(true);
+        
+        // Fetch clients first
+        const { data: clientsData, error: clientsError } = await clientService.getClientsWithProfiles(user.id);
+        
+        if (clientsError) {
+          setError(clientsError.message);
+          toast.error("Failed to load clients");
+          return;
+        }
+        
+        setClients(clientsData || []);
+        
+        // Fetch sessions
+        const { data: sessionsData, error: sessionsError } = await sessionService.getSessionsByTherapist(user.id);
+        
+        if (sessionsError) {
+          setError(sessionsError.message);
+          toast.error("Failed to load sessions");
+          return;
+        }
+        
+        setSessions(sessionsData || []);
+      } catch (err: any) {
+        setError(err.message);
+        toast.error("An error occurred while loading data");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchData();
+  }, [user?.id]);
+
+  const handleNewSession = async () => {
+    if (!user?.id) {
+      toast.error("You must be logged in to create sessions");
+      return;
+    }
+    
+    try {
+      // Format the data according to the expected structure in SessionService
+      const sessionData = {
+        client_id: newSession.client,
+        therapist_id: user.id,
+        session_date: `${newSession.date}T${newSession.time}:00`,
+        duration_minutes: 50, // Default session length
+        session_type: newSession.type as "In-person" | "Virtual",
+        status: 'Scheduled' as "Scheduled" | "Completed" | "Canceled" | "No-show"
+      };
+      
+      const { data, error } = await sessionService.create(sessionData);
+      
+      if (error) {
+        toast.error("Failed to create session");
+        return;
+      }
+      
+      if (data) {
+        toast.success("Session scheduled successfully");
+        setSessions([data, ...sessions]);
+        setNewSessionDialogOpen(false);
+      }
+    } catch (err: any) {
+      toast.error(err.message || "Failed to schedule session");
+    }
   };
 
-  const handleEditSessionSave = (updatedSession) => {
-    setSessionsList(sessionsList.map(s => s.id === updatedSession.id ? updatedSession : s));
-    setEditSession(null);
+  const handleEditSessionSave = async (updatedSessionData: any) => {
+    if (!editSession?.id) return;
+    
+    try {
+      const { data, error } = await sessionService.update(editSession.id, updatedSessionData);
+      
+      if (error) {
+        toast.error("Failed to update session");
+        return;
+      }
+      
+      if (data) {
+        toast.success("Session updated successfully");
+        setSessions(sessions.map(s => s.id === editSession.id ? data : s));
+        setEditSession(null);
+      }
+    } catch (err: any) {
+      toast.error(err.message || "Failed to update session");
+    }
   };
 
   return (
@@ -135,14 +227,20 @@ const Sessions = () => {
         </CardContent>
       </Card>
 
-      <Tabs defaultValue="upcoming" className="w-full">
-        <TabsList className="mb-4 bg-gray-100 rounded-lg flex flex-wrap">
-          <TabsTrigger value="upcoming" className="rounded-l-lg text-base font-semibold">Upcoming</TabsTrigger>
-          <TabsTrigger value="today" className="text-base font-semibold">Today</TabsTrigger>
-          <TabsTrigger value="completed" className="text-base font-semibold">Completed</TabsTrigger>
-          <TabsTrigger value="all" className="rounded-r-lg text-base font-semibold">All Sessions</TabsTrigger>
-        </TabsList>
-        {['upcoming', 'today', 'completed', 'all'].map((tab) => (
+      {loading ? (
+        <div className="flex flex-col items-center justify-center py-12">
+          <Loader2 className="h-10 w-10 animate-spin text-therapy-purple mb-4" />
+          <p className="text-lg text-gray-600">Loading sessions...</p>
+        </div>
+      ) : (
+        <Tabs defaultValue="upcoming" className="w-full">
+          <TabsList className="mb-4 bg-gray-100 rounded-lg flex flex-wrap">
+            <TabsTrigger value="upcoming" className="rounded-l-lg text-base font-semibold">Upcoming</TabsTrigger>
+            <TabsTrigger value="today" className="text-base font-semibold">Today</TabsTrigger>
+            <TabsTrigger value="completed" className="text-base font-semibold">Completed</TabsTrigger>
+            <TabsTrigger value="all" className="rounded-r-lg text-base font-semibold">All Sessions</TabsTrigger>
+          </TabsList>
+          {['upcoming', 'today', 'completed', 'all'].map((tab) => (
           <TabsContent key={tab} value={tab} className="pt-2">
             <Card className="shadow-lg rounded-2xl border border-gray-200">
               <CardContent className="p-0">
@@ -159,7 +257,7 @@ const Sessions = () => {
                       </tr>
                     </thead>
                     <tbody>
-                      {sessionsList
+                      {sessions
                         .filter(session => 
                           (tab === "all" || 
                            (tab === "upcoming" && session.status === "Upcoming") ||
@@ -167,9 +265,9 @@ const Sessions = () => {
                            (tab === "completed" && session.status === "Completed")) &&
                           (sessionType === "all" || session.type.toLowerCase() === sessionType) &&
                           (searchQuery === "" || 
-                           session.clientName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                           session.date.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                           session.time.toLowerCase().includes(searchQuery.toLowerCase()))
+                           session.clientName?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                           session.date?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                           session.time?.toLowerCase().includes(searchQuery.toLowerCase()))
                         )
                         .map((session) => (
                         <tr key={session.id} className="border-b hover:bg-gray-100 transition-all">
@@ -220,7 +318,7 @@ const Sessions = () => {
                           </td>
                         </tr>
                       ))}
-                      {sessionsList.filter(session => 
+                      {sessions.filter(session => 
                         tab === "all" || 
                         (tab === "upcoming" && session.status === "Upcoming") ||
                         (tab === "today" && session.status === "Today") ||
@@ -239,7 +337,8 @@ const Sessions = () => {
             </Card>
           </TabsContent>
         ))}
-      </Tabs>
+        </Tabs>
+      )}
 
       {/* Edit Session Dialog */}
       {editSession && (
@@ -305,7 +404,7 @@ const Sessions = () => {
             <div className="text-gray-500 mb-6 text-center">Are you sure you want to delete this session? This action cannot be undone.</div>
             <div className="flex gap-4 w-full justify-center">
               <Button type="button" variant="outline" onClick={() => setDeleteSessionId(null)} className="rounded-full px-6 py-2">Cancel</Button>
-              <Button type="button" className="bg-red-500 hover:bg-red-600 text-white px-6 py-2 rounded-full font-bold shadow-md transition-all duration-200" onClick={() => { setSessionsList(sessionsList.filter(s => s.id !== deleteSessionId)); setDeleteSessionId(null); }}>Delete</Button>
+              <Button type="button" className="bg-red-500 hover:bg-red-600 text-white px-6 py-2 rounded-full font-bold shadow-md transition-all duration-200" onClick={() => { setSessions(sessions.filter(s => s.id !== deleteSessionId)); setDeleteSessionId(null); }}>Delete</Button>
             </div>
           </div>
         </div>
