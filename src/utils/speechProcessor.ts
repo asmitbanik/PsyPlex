@@ -1,5 +1,5 @@
 import Meyda from "meyda";
-import { voiceProfileService, VoiceProfile } from "@/services/voiceProfileService";
+import { voiceProfileService, VoiceProfile as StoredVoiceProfile } from "@/services/voiceProfileService";
 
 type MFCCProfile = number[];
 
@@ -95,4 +95,4 @@ export class SpeechToTextClassifier implements SpeechClassifier {
   private euclideanDistance(a: number[], b: number[]): number {
     return Math.sqrt(a.reduce((sum, ai, i) => sum + (ai - b[i]) ** 2, 0));
   }
-} 
+}

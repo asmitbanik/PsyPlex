@@ -4,15 +4,18 @@ import { UploadCloud, X, FileAudio, LoaderCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { toast } from "@/hooks/use-toast";
+import { processAudioSession } from "@/services/transcriptionService";
 
 interface AudioUploaderProps {
   onTranscriptionComplete: (text: string) => void;
+  onReportGenerated?: (report: string) => void;
 }
 
-const AudioUploader = ({ onTranscriptionComplete }: AudioUploaderProps) => {
+const AudioUploader = ({ onTranscriptionComplete, onReportGenerated }: AudioUploaderProps) => {
   const [file, setFile] = useState<File | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [progress, setProgress] = useState<number>(0);
+  const [stage, setStage] = useState<string>("idle"); // idle, transcription, analysis, complete
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = e.target.files?.[0];
@@ -45,57 +48,46 @@ const AudioUploader = ({ onTranscriptionComplete }: AudioUploaderProps) => {
   const handleRemoveFile = () => {
     setFile(null);
   };
-
   const handleTranscription = async () => {
     if (!file) return;
     
     setIsLoading(true);
     setProgress(0);
-    
-    // Simulate transcription with a progress bar
-    // In a real implementation, you would connect to Whisper API or other transcription service
-    const intervalId = setInterval(() => {
-      setProgress(prev => {
-        if (prev >= 95) {
-          clearInterval(intervalId);
-          return 95;
-        }
-        return prev + 5;
-      });
-    }, 200);
+    setStage("transcription");
     
     try {
-      // Simulate API call delay
-      await new Promise(resolve => setTimeout(resolve, 2000));
-      
-      // Clear the interval and set progress to 100%
-      clearInterval(intervalId);
-      setProgress(100);
-      
-      // Simulate successful transcription
-      const mockTranscription = 
-        "Client reports feeling anxious and overwhelmed with work deadlines. " +
-        "They mentioned having trouble sleeping and concentrating. " +
-        "We discussed potential cognitive distortions related to performance expectations and " +
-        "the client identified several instances of catastrophizing. " +
-        "Client showed good insight into how these thought patterns affect their emotional state. " +
-        "Homework assigned: daily thought record and progressive muscle relaxation practice.";
-      
-      setTimeout(() => {
-        setIsLoading(false);
-        onTranscriptionComplete(mockTranscription);
+      // Process the audio file using our transcriptionService
+      await processAudioSession(
+        file, 
+        (currentStage, currentProgress) => {
+          setStage(currentStage);
+          setProgress(currentProgress);
+        }
+      ).then(({ transcription, report }) => {
+        // Update with transcription result
+        onTranscriptionComplete(transcription);
+        
+        // Pass the report if handler is provided
+        if (onReportGenerated) {
+          onReportGenerated(report);
+        }
+        
         toast({
-          title: "Transcription complete",
-          description: "Audio has been successfully transcribed",
+          title: "Processing complete",
+          description: "Audio has been transcribed and analyzed",
         });
-      }, 500);
-      
+        
+        setIsLoading(false);
+        setStage("complete");
+      });
     } catch (error) {
-      clearInterval(intervalId);
+      console.error("Error in transcription process:", error);
       setIsLoading(false);
+      setStage("idle");
+      
       toast({
-        title: "Transcription failed",
-        description: "There was an error transcribing your audio",
+        title: "Processing failed",
+        description: error instanceof Error ? error.message : "There was an error processing your audio",
         variant: "destructive",
       });
     }
@@ -160,10 +152,11 @@ const AudioUploader = ({ onTranscriptionComplete }: AudioUploaderProps) => {
                       style={{ width: `${progress}%` }}
                     ></div>
                   </div>
-                  <div className="flex items-center justify-center">
-                    <LoaderCircle className="animate-spin h-4 w-4 mr-2" />
+                  <div className="flex items-center justify-center">                    <LoaderCircle className="animate-spin h-4 w-4 mr-2" />
                     <span className="text-sm">
-                      {progress === 100 ? "Processing..." : "Transcribing..."}
+                      {stage === "transcription" && "Transcribing audio..."}
+                      {stage === "analysis" && "Generating clinical report..."}
+                      {stage === "complete" && "Processing complete!"}
                     </span>
                   </div>
                 </div>

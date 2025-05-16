@@ -183,7 +183,7 @@ export default function AddClientForm({ onSubmit, onCancel, initialData, onDelet
             </div>
           </div>
         )}
-        <style jsx>{`
+        <style>{`
           .input-floating {
             background: rgba(255,255,255,0.7);
             border-radius: 0.75rem;

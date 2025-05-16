@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -10,6 +10,9 @@ import { FileText, AudioWaveform, Mic, Brain, Heart, Target, ScrollText } from "
 import therapyInsightsData from "@/data/therapyInsightsData.json";
 import SaveNoteDialog from "@/components/SaveNoteDialog";
 import { notesService } from "@/services/notesService";
+import clientsData from "@/data/clientsData.json";
+import { generateClinicalReport } from "@/services/transcriptionService";
+import type { TherapyFormat } from "@/utils/promptGenerator";
 
 interface InsightCardProps {
   title: string;
@@ -31,55 +34,281 @@ const InsightCard = ({ title, description, children }: InsightCardProps) => {
 
 const TherapyInsights = () => {
   const [selectedTherapy, setSelectedTherapy] = useState("cbt");
+  const [selectedFormat, setSelectedFormat] = useState<'SOAP' | 'BIRP' | 'DAP' | 'Scribbled Notes'>('SOAP');
   const [sessionNotes, setSessionNotes] = useState("");
+  const [clinicalReport, setClinicalReport] = useState<any>(null);
   const [isGenerating, setIsGenerating] = useState(false);
   const [insightsGenerated, setInsightsGenerated] = useState(false);
   const [inputMethod, setInputMethod] = useState<"text" | "audio" | "live">("live");
   const [isSaveDialogOpen, setSaveDialogOpen] = useState(false);
+  const reportSectionRef = useRef<HTMLDivElement>(null); // Added ref for the report section
 
-  const handleGenerateInsights = () => {
-    if (!sessionNotes.trim()) return;
+  // Prepare clients data for the dialog
+  const clientListForDialog = clientsData.clients.map(client => ({ id: client.id, name: client.name }));
+
+  const formatInsightsForSave = (insightsData: any): string[] => {
+    const insightsArray: string[] = [];
+    if (!insightsData || typeof insightsData !== 'object') return insightsArray;
+
+    if (insightsData.keyPatterns && Array.isArray(insightsData.keyPatterns)) {
+      insightsData.keyPatterns.forEach((item: string) => {
+        insightsArray.push(`Key Pattern: ${item}`);
+      });
+      if (insightsArray.length > 0) return insightsArray; // If keyPatterns found, assume it's the primary structure
+    }
+
+    const knownComplexKeys: Record<string, string> = {
+      cognitiveDistortions: "Cognitive Distortion",
+      behavioralPatterns: "Behavioral Pattern",
+      coreBeliefs: "Core Belief",
+      emotionalRegulation: "Emotional Regulation",
+      interpersonalEffectiveness: "Interpersonal Effectiveness",
+      distressTolerance: "Distress Tolerance"
+    };
+
+    let specificKeysFound = false;
+    for (const key in knownComplexKeys) {
+      if (insightsData[key] && Array.isArray(insightsData[key]) && insightsData[key].length > 0) {
+        (insightsData[key] as string[]).forEach((item: string) => {
+          insightsArray.push(`${knownComplexKeys[key]}: ${item}`);
+        });
+        specificKeysFound = true;
+      }
+    }
     
-    setIsGenerating(true);
-    
-    // Simulate API call to AI service
-    setTimeout(() => {
-      setIsGenerating(false);
+    if (!specificKeysFound && insightsArray.length === 0) { 
+       for (const key in insightsData) {
+          if (Object.prototype.hasOwnProperty.call(insightsData, key) && Array.isArray(insightsData[key])) {
+              const titleKey = key.replace(/([A-Z])/g, ' $1').replace(/^./, (str) => str.toUpperCase());
+              (insightsData[key] as any[]).forEach((item: any) => { 
+                  insightsArray.push(`${titleKey}: ${String(item)}`);
+              });
+          }
+       }
+    }
+    return insightsArray;
+  };
+
+  const processTextInput = async (text: string) => {
+    try {
+      setIsGenerating(true);
+
+      // Save text input to database
+      const sessionId = crypto.randomUUID();
+      const savedNote = notesService.saveNote({
+        id: sessionId,
+        title: `Therapy Session - ${new Date().toLocaleDateString()}`,
+        date: new Date().toISOString(),
+        therapyType: selectedFormat,
+        content: {
+          insights: {},
+          recommendations: {
+            nextSession: [],
+            homework: []
+          }
+        },
+        tags: ['text-input', selectedFormat.toLowerCase()]
+      });
+
+      // Generate clinical report using Gemini
+      const report = await generateClinicalReport(text, selectedFormat);
+      
+      // Parse the JSON report
+      const parsedReport = JSON.parse(report);
+      setClinicalReport(parsedReport);
+
+      // Update the saved note with structured insights
+      if (savedNote) {
+        notesService.updateNote(savedNote.id, {
+          content: {
+            insights: parsedReport,
+            recommendations: {
+              nextSession: parsedReport.Plan || parsedReport.followUp || [],
+              homework: []
+            }
+          }
+        });
+      }
+
       setInsightsGenerated(true);
       toast({
-        title: "Insights Generated",
-        description: "AI analysis complete based on your session notes."
+        title: "Analysis Complete",
+        description: "Clinical report has been generated from your notes",
       });
-    }, 2000);
+
+    } catch (error) {
+      console.error('Error processing text input:', error);
+      toast({
+        title: "Processing Failed",
+        description: error instanceof Error ? error.message : "Failed to generate clinical report",
+        variant: "destructive"
+      });
+    } finally {
+      setIsGenerating(false);
+    }
   };
 
-  const handleTranscriptionComplete = (transcription: string) => {
-    setSessionNotes(transcription);
+  const handleGenerateInsights = async () => {
+    if (!sessionNotes.trim()) {
+      toast({
+        title: "No Content",
+        description: "Please enter session notes or record/upload audio first",
+        variant: "destructive"
+      });
+      return;
+    }
+    
+    if (inputMethod === "text") {
+      await processTextInput(sessionNotes);
+    } else if (clinicalReport) {
+      // If we already have a clinical report from audio processing, just show it
+      setInsightsGenerated(true);
+    }
   };
 
-  const handleSaveNote = (title: string, tags: string[]) => {
+  useEffect(() => {
+    if (insightsGenerated && reportSectionRef.current) {
+      // Add a slight delay to ensure the DOM is fully rendered
+      setTimeout(() => {
+        reportSectionRef.current?.scrollIntoView({ 
+          behavior: "smooth", 
+          block: "start" 
+        });
+      }, 100);
+    }
+  }, [insightsGenerated]); // Dependency array ensures this runs when insightsGenerated changes
+
+  const handleFormatChange = (format: 'SOAP' | 'BIRP' | 'DAP' | 'Scribbled Notes') => {
+    setSelectedFormat(format);
+    if (sessionNotes) {
+      processTranscription(sessionNotes, format);
+    }
+  };
+
+  const processTranscription = async (text: string, format: TherapyFormat) => {
+    try {
+      setIsGenerating(true);
+      
+      // Store transcription in the database
+      const sessionId = crypto.randomUUID();
+      const savedNote = notesService.saveNote({
+        clientId: '', // This will be set when saving the final note
+        title: `Therapy Session - ${new Date().toLocaleDateString()}`,
+        // Removed the date property as it is not part of the ClinicalNote type
+        therapyType: format,
+        content: {
+          insights: {},
+          recommendations: {
+            nextSession: [],
+            homework: []
+          }
+        },
+        tags: ['transcription', format.toLowerCase()]
+      });
+
+      // Generate clinical report using Gemini
+      const report = await generateClinicalReport(text, format);
+      
+      // Parse the JSON report
+      const parsedReport = JSON.parse(report);
+      setClinicalReport(parsedReport);
+
+      // Create structured note
+      const structuredNote: {
+        format: TherapyFormat;
+        content: any;
+        transcription: string;
+        timestamp: string;
+        sessionId: string;
+      } = {
+        format,
+        content: parsedReport,
+        transcription: text,
+        timestamp: new Date().toISOString(),
+        sessionId
+      };
+
+      // Update the saved note with the structured note
+      if (savedNote) {
+        notesService.updateNote(savedNote.id, {
+          content: {
+            insights: structuredNote,
+            recommendations: {
+              nextSession: parsedReport.Plan || parsedReport.followUp || [],
+              homework: []
+            }
+          }
+        });
+      }
+
+      setInsightsGenerated(true);
+
+    } catch (error) {
+      console.error('Error processing transcription:', error);
+      toast({
+        title: "Error processing transcription",
+        description: error instanceof Error ? error.message : "An unexpected error occurred",
+        variant: "destructive",
+      });
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
+  const handleTranscriptionComplete = (text: string) => {
+    setSessionNotes(text);
+    processTranscription(text, selectedFormat);
+  };
+
+  const handleReportGenerated = (report: string) => {
+    setClinicalReport(report);
+    // Automatically set insights as generated since we have a clinical report
+    setInsightsGenerated(true);
+  };
+
+  const handleSaveNote = (noteData: { title: string; tags: string[]; content: string; therapyType: string; clientId?: string }) => {
     const selectedTherapyData = therapyInsightsData.therapyTypes.find(
       therapy => therapy.id === selectedTherapy
     );
 
-    if (!selectedTherapyData) return;
+    if (!selectedTherapyData) {
+      toast({ title: "Error", description: "Selected therapy approach not found.", variant: "destructive" });
+      return;
+    }
+    if (!noteData.clientId) {
+      toast({ title: "Error", description: "Please select a client.", variant: "destructive" });
+      return;
+    }
 
     try {
+      const formattedGeneratedInsights = formatInsightsForSave(selectedTherapyData.insights);
+      const recommendationsForSave = selectedTherapyData.recommendations || { nextSession: [], homework: [] };
+
+      const finalContentObject = {
+        insights: [
+          `Session Input (Transcription/Notes): ${sessionNotes}`,
+          `User's Note Summary: ${noteData.content}`, // Content from SaveNoteDialog
+          ...formattedGeneratedInsights // Formatted insights from JSON based on selected therapy
+        ],
+        recommendations: recommendationsForSave,
+      };
+
       notesService.saveNote({
-        title,
-        therapyType: selectedTherapyData.name,
-        content: {
-          insights: selectedTherapyData.insights,
-          recommendations: selectedTherapyData.recommendations
-        },
-        tags
+        title: noteData.title,
+        therapyType: noteData.therapyType || selectedTherapyData.name, // Use dialog's type or fallback
+        content: finalContentObject, // Pass the structured object directly
+        tags: noteData.tags,
+        clientId: noteData.clientId,
+        // Removed status as it is not part of the ClinicalNote type
       });
 
       toast({
         title: "Note Saved",
         description: "Clinical note has been saved successfully."
       });
+      setSaveDialogOpen(false); // Close dialog on successful save
     } catch (error) {
+      console.error("Failed to save note:", error);
       toast({
         title: "Error",
         description: "Failed to save the note. Please try again.",
@@ -198,23 +427,69 @@ const TherapyInsights = () => {
             </div>
             <div className="bg-gray-50 rounded-xl p-4 shadow-inner">
               {inputMethod === "text" ? (
-                <Textarea
-                  id="session-notes"
-                  placeholder="Enter your session notes here..."
-                  className="h-40 rounded-lg shadow-sm"
-                  value={sessionNotes}
-                  onChange={(e) => setSessionNotes(e.target.value)}
-                />
+                <div className="space-y-4">
+                  <Textarea
+                    id="session-notes"
+                    placeholder="Enter your session notes here..."
+                    className="h-40 rounded-lg shadow-sm"
+                    value={sessionNotes}
+                    onChange={(e) => setSessionNotes(e.target.value)}
+                  />
+                  {sessionNotes && clinicalReport && (
+                    <div className="mt-4">
+                      <h3 className="text-sm font-medium mb-2">Clinical Report:</h3>
+                      <div className="p-3 bg-muted rounded-md border-l-4 border-therapy-purple">
+                        <div className="prose prose-sm max-w-none">
+                          {Object.entries(clinicalReport).map(([section, items]) => (
+                            <div key={section} className="mb-4">
+                              <h4 className="font-medium text-therapy-purple mb-2">
+                                {section.replace(/([A-Z])/g, ' $1').trim()}
+                              </h4>
+                              <ul className="list-disc pl-5 space-y-1">
+                                {Array.isArray(items) && items.map((item, index) => (
+                                  <li key={index} className="text-sm">{item}</li>
+                                ))}
+                              </ul>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
               ) : inputMethod === "live" ? (
-                <LiveRecorder onTranscriptionComplete={handleTranscriptionComplete} />
+                <LiveRecorder 
+                  onTranscriptionComplete={handleTranscriptionComplete}
+                  onReportGenerated={handleReportGenerated} 
+                />
               ) : (
-                <AudioUploader onTranscriptionComplete={handleTranscriptionComplete} />
+                <AudioUploader 
+                  onTranscriptionComplete={handleTranscriptionComplete}
+                  onReportGenerated={handleReportGenerated}
+                />
               )}
               {(inputMethod === "audio" || inputMethod === "live") && sessionNotes && (
                 <div className="mt-4">
                   <h3 className="text-sm font-medium mb-2">Transcription:</h3>
                   <div className="p-3 bg-muted rounded-md">
                     <p className="text-sm">{sessionNotes}</p>
+                  </div>
+                </div>
+              )}
+              
+              {clinicalReport && (
+                <div className="mt-4">
+                  <h3 className="text-sm font-medium mb-2">Clinical Report:</h3>
+                  <div className="p-3 bg-muted rounded-md border-l-4 border-therapy-purple">
+                    <div className="prose prose-sm max-w-none">
+                      {clinicalReport.split('\n').map((line, i) => (
+                        line.trim() ? (
+                          <p key={i} className="text-sm mb-2">{line}</p>
+                        ) : (
+                          <br key={i} />
+                        )
+                      ))}
+                    </div>
                   </div>
                 </div>
               )}
@@ -233,7 +508,7 @@ const TherapyInsights = () => {
       </Card>
 
       {insightsGenerated && selectedTherapyData && (
-        <Card className="shadow-lg rounded-2xl border border-gray-200 animate-fade-in">
+        <Card ref={reportSectionRef} className="shadow-lg rounded-2xl border border-gray-200 animate-fade-in">
           <CardHeader>
             <CardTitle className="text-xl sm:text-2xl font-bold text-therapy-gray">
               {selectedTherapyData.name} Insights
@@ -247,14 +522,14 @@ const TherapyInsights = () => {
               </TabsList>
               <TabsContent value="insights">
                 <div className="space-y-4 pt-2">
-                  {selectedTherapy === "cbt" && (
+                  {selectedTherapy === "cbt" && selectedTherapyData.insights && (
                     <>
                       <InsightCard 
                         title="Cognitive Distortions" 
                         description="Identified thought patterns that may be reinforcing negative emotions"
                       >
                         <ul className="list-disc pl-5 space-y-2">
-                          {selectedTherapyData.insights.cognitiveDistortions.map((distortion, index) => (
+                          {selectedTherapyData.insights.cognitiveDistortions?.map((distortion: string, index: number) => (
                             <li key={index}>{distortion}</li>
                           ))}
                         </ul>
@@ -264,7 +539,7 @@ const TherapyInsights = () => {
                         description="Observed behaviors that may be maintaining the presenting problems"
                       >
                         <ul className="list-disc pl-5 space-y-2">
-                          {selectedTherapyData.insights.behavioralPatterns.map((pattern, index) => (
+                          {selectedTherapyData.insights.behavioralPatterns?.map((pattern: string, index: number) => (
                             <li key={index}>{pattern}</li>
                           ))}
                         </ul>
@@ -274,21 +549,21 @@ const TherapyInsights = () => {
                         description="Underlying beliefs that may be contributing to current difficulties"
                       >
                         <ul className="list-disc pl-5 space-y-2">
-                          {selectedTherapyData.insights.coreBeliefs.map((belief, index) => (
+                          {selectedTherapyData.insights.coreBeliefs?.map((belief: string, index: number) => (
                             <li key={index}>{belief}</li>
                           ))}
                         </ul>
                       </InsightCard>
                     </>
                   )}
-                  {selectedTherapy === "dbt" && (
+                  {selectedTherapy === "dbt" && selectedTherapyData.insights && (
                     <>
                       <InsightCard 
                         title="Emotional Regulation" 
                         description="Observations related to emotional awareness and regulation"
                       >
                         <ul className="list-disc pl-5 space-y-2">
-                          {selectedTherapyData.insights.emotionalRegulation.map((item, index) => (
+                          {selectedTherapyData.insights.emotionalRegulation?.map((item: string, index: number) => (
                             <li key={index}>{item}</li>
                           ))}
                         </ul>
@@ -298,7 +573,7 @@ const TherapyInsights = () => {
                         description="Skills and challenges in relationships with others"
                       >
                         <ul className="list-disc pl-5 space-y-2">
-                          {selectedTherapyData.insights.interpersonalEffectiveness.map((item, index) => (
+                          {selectedTherapyData.insights.interpersonalEffectiveness?.map((item: string, index: number) => (
                             <li key={index}>{item}</li>
                           ))}
                         </ul>
@@ -308,20 +583,20 @@ const TherapyInsights = () => {
                         description="Ability to tolerate and survive crisis situations"
                       >
                         <ul className="list-disc pl-5 space-y-2">
-                          {selectedTherapyData.insights.distressTolerance.map((item, index) => (
+                          {selectedTherapyData.insights.distressTolerance?.map((item: string, index: number) => (
                             <li key={index}>{item}</li>
                           ))}
                         </ul>
                       </InsightCard>
                     </>
                   )}
-                  {(selectedTherapy === "psychodynamic" || selectedTherapy === "solution-focused") && (
+                  {(selectedTherapy === "psychodynamic" || selectedTherapy === "solution-focused") && selectedTherapyData.insights && (
                     <InsightCard 
                       title="Key Patterns and Themes" 
                       description="Main observations from this therapy approach"
                     >
                       <ul className="list-disc pl-5 space-y-2">
-                        {selectedTherapyData.insights.keyPatterns.map((pattern, index) => (
+                        {selectedTherapyData.insights.keyPatterns?.map((pattern: string, index: number) => (
                           <li key={index}>{pattern}</li>
                         ))}
                       </ul>
@@ -341,7 +616,7 @@ const TherapyInsights = () => {
                     <div className="space-y-2">
                       <h3 className="font-medium text-therapy-gray">For Next Session</h3>
                       <ul className="list-disc pl-5 space-y-2 text-gray-600">
-                        {selectedTherapyData.recommendations.nextSession.map((item, index) => (
+                        {selectedTherapyData.recommendations?.nextSession.map((item, index) => (
                           <li key={index}>{item}</li>
                         ))}
                       </ul>
@@ -356,7 +631,8 @@ const TherapyInsights = () => {
                       </Button>
                     </div>
                   </CardContent>
-                </Card>              </TabsContent>
+                </Card>
+              </TabsContent>
             </Tabs>
           </CardContent>
         </Card>
@@ -366,6 +642,11 @@ const TherapyInsights = () => {
         isOpen={isSaveDialogOpen}
         onClose={() => setSaveDialogOpen(false)}
         onSave={handleSaveNote}
+        clients={clientListForDialog} // Pass the client list here
+        initialData={{ // Pass initial data for the note, including the current session notes
+          content: sessionNotes,
+          therapyType: selectedTherapyData?.name,
+        }}
       />
     </div>
   );

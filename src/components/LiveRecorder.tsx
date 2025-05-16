@@ -4,11 +4,16 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { toast } from "@/hooks/use-toast";
 import { SpeechToTextClassifier } from "@/utils/speechProcessor";
-import { useAuth } from "@/hooks/useAuth"; // Assuming you have an auth hook
+import { useAuth } from "@/hooks/useAuth";
+import { sendAudioToHume, pollForTranscription, processAudioSession } from "@/services/transcriptionService";
+import { TherapyFormat } from "@/types/therapy";
 
 interface LiveRecorderProps {
   onTranscriptionComplete: (text: string) => void;
   onInitialProfileCapture?: () => void;
+  onReportGenerated?: (report: any) => void;
+  selectedFormat: TherapyFormat;
+  onProcessingProgress?: (stage: string, progress: number) => void;
 }
 
 interface TranscriptionSegment {
@@ -19,7 +24,10 @@ interface TranscriptionSegment {
 
 const LiveRecorder = ({ 
   onTranscriptionComplete,
-  onInitialProfileCapture 
+  onInitialProfileCapture,
+  onReportGenerated,
+  selectedFormat,
+  onProcessingProgress
 }: LiveRecorderProps) => {
   const { user } = useAuth(); // Get the current user
   const [isRecording, setIsRecording] = useState(false);
@@ -174,26 +182,64 @@ const LiveRecorder = ({
       // Stop all audio tracks
       mediaRecorderRef.current.stream.getTracks().forEach(track => track.stop());
     }
-  };
-
-  const processRecording = async (audioBlob: Blob) => {
+  };  const processRecording = async (audioBlob: Blob) => {
     setIsProcessing(true);
     
     try {
-      // Format the transcript segments into a readable text
+      // Format real-time transcription segments
       const formattedTranscript = transcriptSegments
         .map(segment => `${segment.speaker}: ${segment.text}`)
         .join("\n");
+
+      let finalTranscript = formattedTranscript;
       
-      onTranscriptionComplete(formattedTranscript);
-      toast({
-        title: "Recording processed",
-        description: "Audio has been successfully transcribed",
-      });
+      try {
+        // Try Hume for more accurate transcription
+        onProcessingProgress?.("transcription", 10);
+        const humeJobId = await sendAudioToHume(audioBlob);
+        
+        onProcessingProgress?.("transcription", 50);
+        const humeTranscription = await pollForTranscription(humeJobId);
+        
+        // Use Hume's transcription if successful
+        if (humeTranscription) {
+          finalTranscript = humeTranscription;
+          onProcessingProgress?.("transcription", 100);
+        }
+      } catch (humeError) {
+        console.warn("Hume transcription failed, using real-time transcription:", humeError);
+      }
+
+      // Send transcription for processing
+      onTranscriptionComplete(finalTranscript);
+      
+      try {
+        onProcessingProgress?.("analysis", 0);
+        // Process transcription with selected format to generate clinical report
+        const { report } = await processAudioSession(audioBlob, selectedFormat);
+        
+        // Send report if handler is provided
+        if (onReportGenerated) {
+          onReportGenerated(report);
+        }
+
+        toast({
+          title: "Processing complete",
+          description: "Session has been transcribed and analyzed",
+        });
+      } catch (reportError) {
+        console.error("Error generating clinical report:", reportError);
+        toast({
+          title: "Report generation failed",
+          description: "Transcription successful but couldn't generate clinical report",
+          variant: "destructive",
+        });
+      }
     } catch (error) {
+      console.error("Error processing recording:", error);
       toast({
         title: "Processing failed",
-        description: "There was an error processing your recording",
+        description: error instanceof Error ? error.message : "An error occurred while processing the recording",
         variant: "destructive",
       });
     } finally {
@@ -289,4 +335,4 @@ const LiveRecorder = ({
   );
 };
 
-export default LiveRecorder; 
+export default LiveRecorder;
