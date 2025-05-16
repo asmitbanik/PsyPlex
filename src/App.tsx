@@ -5,8 +5,11 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import LiveRecorder from "@/components/LiveRecorder";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
-import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
+import { supabase } from "@/lib/supabase";
+import { AuthProvider } from "@/contexts/AuthContext";
+import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 
 import Index from "./pages/Index";
 import NotFound from "./pages/NotFound";
@@ -19,28 +22,56 @@ import ProgressTracker from "./pages/ProgressTracker";
 import Notes from "./pages/Notes";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
+import AuthCallback from "./pages/AuthCallback";
 import Layout from "./components/Layout";
 import AuthLayout from "./components/AuthLayout";
+import AuthRedirect from "./components/AuthRedirect";
 
-const queryClient = new QueryClient();
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      retry: 1,
+      refetchOnWindowFocus: false,
+      staleTime: 5 * 60 * 1000, // 5 minutes
+    },
+  },
+});
 
 const App = () => {
-  const { user, logout } = useAuth();
-
   const handleTranscriptionComplete = (text: string) => {
     console.log("Transcription:", text);
   };
 
+  // Set up auth state listener for handling OAuth callbacks
+  useEffect(() => {
+    // This sets up a listener for auth state changes including OAuth redirects
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      console.log('Supabase auth event:', event);
+      if (event === 'SIGNED_IN' && session) {
+        console.log('User signed in successfully');
+        // We could redirect here if needed
+      }
+    });
+
+    // Cleanup function to unsubscribe when component unmounts
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, []);
+
   return (
     <QueryClientProvider client={queryClient}>
-      <TooltipProvider>
-        <Toaster />
-        <Sonner />
-        <BrowserRouter>
-          <Routes>
-            <Route path="/" element={<Index />} />
-            <Route path="/login" element={<Login />} />
-            <Route path="/register" element={<Register />} />
+      <AuthProvider>
+        <TooltipProvider>
+          <Toaster />
+          <Sonner />
+          <BrowserRouter>
+            <AuthRedirect />
+            <Routes>
+              <Route path="/" element={<Index />} />
+              <Route path="/login" element={<Login />} />
+              <Route path="/register" element={<Register />} />
+              <Route path="/auth/callback" element={<AuthCallback />} />
             
             <Route path="/therapist" element={<AuthLayout />}>
               <Route element={<Layout />}>
@@ -56,29 +87,8 @@ const App = () => {
             <Route path="*" element={<NotFound />} />
           </Routes>
         </BrowserRouter>
-      </TooltipProvider>
-      <ProtectedRoute>
-        <div className="min-h-screen bg-background p-4">
-          <div className="max-w-4xl mx-auto space-y-4">
-            {user && (
-              <div className="flex justify-between items-center">
-                <div className="text-sm text-muted-foreground">
-                  Logged in as: {user.email}
-                </div>
-                <Button
-                  variant="outline"
-                  onClick={logout}
-                  className="text-sm"
-                >
-                  Logout
-                </Button>
-              </div>
-            )}
-            
-            <LiveRecorder onTranscriptionComplete={handleTranscriptionComplete} />
-          </div>
-        </div>
-      </ProtectedRoute>
+        </TooltipProvider>
+      </AuthProvider>
     </QueryClientProvider>
   );
 };

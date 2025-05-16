@@ -1,18 +1,88 @@
+import { useState, useEffect } from "react";
 import { useParams, Link } from "react-router-dom";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { ArrowLeft, FileText, CalendarCheck } from "lucide-react";
-import clientsData from "@/data/clientsData.json";
+import { ArrowLeft, FileText, CalendarCheck, Loader2 } from "lucide-react";
+import { ClientService, ClientWithProfile } from "@/services/ClientService";
+import { SessionService } from "@/services/SessionService";
+import { useAuth } from "@/contexts/AuthContext";
+import { toast } from "sonner";
 
 const ClientDetails = () => {
   const { clientId } = useParams<{ clientId: string }>();
-  const client = clientId ? clientsData.clientDetails[clientId] : undefined;
+  const { user } = useAuth();
+  const clientService = new ClientService();
+  const sessionService = new SessionService();
+  
+  const [client, setClient] = useState<ClientWithProfile | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  
+  useEffect(() => {
+    const fetchClientDetails = async () => {
+      if (!clientId) return;
+      
+      try {
+        setLoading(true);
+        const { data, error } = await clientService.getClientWithProfile(clientId);
+        
+        if (error) {
+          setError(error.message);
+          toast.error("Failed to load client details");
+          return;
+        }
+        
+        if (data) {
+          setClient(data);
+        } else {
+          setError("Client not found");
+        }
+      } catch (err: any) {
+        setError(err.message);
+        toast.error("An error occurred while loading client details");
+      } finally {
+        setLoading(false);
+      }
+    };
 
-  if (!client) {
+    fetchClientDetails();
+  }, [clientId]);
+
+  if (loading) {
     return (
       <div className="flex flex-col items-center justify-center h-64">
-        <p className="text-lg text-gray-500 mb-4">Client not found</p>
+        <Loader2 className="h-8 w-8 animate-spin text-therapy-purple" />
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="flex flex-col items-center justify-center h-64">
+        <p className="text-lg text-red-500 mb-4">{error}</p>
+        <Button asChild>
+          <Link to="/therapist/clients">Back to Clients</Link>
+        </Button>
+      </div>
+    );
+  }
+
+  if (loading) {
+    return (
+      <div className="flex flex-col items-center justify-center h-64">
+        <Loader2 className="h-8 w-8 animate-spin text-therapy-purple mb-4" />
+        <p className="text-lg text-gray-500">Loading client details...</p>
+      </div>
+    );
+  }
+  
+  if (error || !client) {
+    return (
+      <div className="flex flex-col items-center justify-center h-64">
+        <p className="text-lg text-gray-500 mb-4">
+          {error || "Client not found"}
+        </p>
         <Button asChild>
           <Link to="/therapist/clients">Back to Clients</Link>
         </Button>
@@ -31,8 +101,13 @@ const ClientDetails = () => {
               </Link>
             </Button>
             <h1 className="text-2xl sm:text-3xl font-bold text-therapy-gray">{client.name}</h1>
-            <span className="inline-block px-2 py-1 rounded-full text-xs bg-green-100 text-green-800 font-medium">
-              Active
+            <span className={`inline-block px-2 py-1 rounded-full text-xs font-medium ${
+              client.status === "Active" ? "bg-green-100 text-green-800" :
+              client.status === "New" ? "bg-blue-100 text-blue-800" :
+              client.status === "On Hold" ? "bg-yellow-100 text-yellow-800" :
+              "bg-gray-100 text-gray-800"
+            }`}>
+              {client.status || "Unknown"}
             </span>
           </div>
         </div>
@@ -68,20 +143,20 @@ const ClientDetails = () => {
                   </div>
                   <div>
                     <p className="text-sm text-gray-500">Date of Birth</p>
-                    <p>{client.dob}</p>
+                    <p>{client.profile?.date_of_birth || 'Not provided'}</p>
                   </div>
                   <div>
                     <p className="text-sm text-gray-500">Occupation</p>
-                    <p>{client.occupation}</p>
+                    <p>{client.profile?.occupation || 'Not provided'}</p>
                   </div>
                 </div>
                 <div>
                   <p className="text-sm text-gray-500">Address</p>
-                  <p>{client.address}</p>
+                  <p>{client.profile?.address || 'Not provided'}</p>
                 </div>
                 <div>
                   <p className="text-sm text-gray-500">Emergency Contact</p>
-                  <p>{client.emergencyContact}</p>
+                  <p>{client.profile?.emergency_contact || 'Not provided'}</p>
                 </div>
               </CardContent>
             </Card>
@@ -94,15 +169,15 @@ const ClientDetails = () => {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                     <p className="text-sm text-gray-500">Start Date</p>
-                    <p>{client.startDate}</p>
+                    <p>{client.profile?.start_date || 'Not provided'}</p>
                   </div>
                   <div>
                     <p className="text-sm text-gray-500">Therapy Type</p>
-                    <p>{client.therapyType}</p>
+                    <p>{client.profile?.therapy_type || 'Not provided'}</p>
                   </div>
                   <div>
                     <p className="text-sm text-gray-500">Sessions Completed</p>
-                    <p>{client.sessions.length}</p>
+                    <p>{client.session_count || 0}</p>
                   </div>
                   <div>
                     <p className="text-sm text-gray-500">Next Session</p>
@@ -111,7 +186,7 @@ const ClientDetails = () => {
                 </div>
                 <div>
                   <p className="text-sm text-gray-500">Primary Concerns</p>
-                  <p>{client.primaryConcerns}</p>
+                  <p>{client.profile?.primary_concerns?.join(', ') || 'Not specified'}</p>
                 </div>
               </CardContent>
             </Card>
@@ -120,20 +195,27 @@ const ClientDetails = () => {
           <Card>
             <CardHeader>
               <CardTitle>Recent Session Notes</CardTitle>
+              <CardDescription>
+                {client.session_count ? "Most recent session notes" : "No sessions recorded yet"}
+              </CardDescription>
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
-                {client.sessions.slice(0, 1).map((session) => (
-                  <div key={session.id} className="p-4 border rounded-md">
+                {client.session_count > 0 ? (
+                  <div className="p-4 border rounded-md">
                     <div className="flex justify-between items-center mb-2">
-                      <p className="font-medium">{session.date} - {session.time} ({session.type})</p>
+                      <p className="font-medium">Last session: {client.last_session_date || 'No date available'}</p>
                       <span className="inline-block px-2 py-1 rounded-full text-xs bg-green-100 text-green-800 font-medium">
-                        {session.status}
+                        Completed
                       </span>
                     </div>
-                    <p className="text-gray-600">{session.notes}</p>
+                    <p className="text-gray-600">Session notes will appear here</p>
                   </div>
-                ))}
+                ) : (
+                  <div className="text-center py-4">
+                    <p className="text-gray-500">No sessions recorded yet</p>
+                  </div>
+                )}
                 <Button variant="outline" className="w-full" asChild>
                   <Link to={`/therapist/clients/${client.id}/sessions`}>
                     View All Sessions
@@ -174,54 +256,62 @@ const ClientDetails = () => {
         
         <TabsContent value="sessions" className="pt-6">
           <Card>
+            <CardHeader>
+              <div className="flex justify-between">
+                <CardTitle>Sessions History</CardTitle>
+                <Button size="sm" className="bg-therapy-purple hover:bg-therapy-purpleDeep">
+                  Schedule Session
+                </Button>
+              </div>
+            </CardHeader>
             <CardContent className="p-0">
-              <div className="overflow-x-auto w-full">
-                <table className="w-full min-w-[700px]">
-                  <thead>
-                    <tr className="border-b">
-                      <th className="text-left p-4">Date</th>
-                      <th className="text-left p-4">Time</th>
-                      <th className="text-left p-4">Type</th>
-                      <th className="text-left p-4">Status</th>
-                      <th className="text-right p-4">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {client.sessions.map((session) => (
-                      <tr key={session.id} className="border-b hover:bg-gray-50">
-                        <td className="p-4">{session.date}</td>
-                        <td className="p-4">{session.time}</td>
-                        <td className="p-4">{session.type}</td>
+              {client.session_count > 0 ? (
+                <div className="overflow-x-auto w-full">
+                  <table className="w-full min-w-[700px]">
+                    <thead>
+                      <tr className="border-b">
+                        <th className="text-left p-4">Date</th>
+                        <th className="text-left p-4">Duration</th>
+                        <th className="text-left p-4">Type</th>
+                        <th className="text-left p-4">Status</th>
+                        <th className="text-right p-4">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr className="border-b hover:bg-gray-50">
+                        <td className="p-4">{client.last_session_date || 'Unknown'}</td>
+                        <td className="p-4">60 min</td>
+                        <td className="p-4">Video</td>
                         <td className="p-4">
-                          <span className={`inline-block px-2 py-1 rounded-full text-xs font-medium ${
-                            session.status === "Completed" ? "bg-green-100 text-green-800" :
-                            session.status === "Upcoming" ? "bg-blue-100 text-blue-800" :
-                            "bg-yellow-100 text-yellow-800"
-                          }`}>
-                            {session.status}
+                          <span className="inline-block px-2 py-1 rounded-full text-xs bg-green-100 text-green-800 font-medium">
+                            Completed
                           </span>
                         </td>
                         <td className="p-4 text-right">
                           <Button variant="ghost" size="sm">View</Button>
                         </td>
                       </tr>
-                    ))}
-                    <tr className="border-b hover:bg-gray-50">
-                      <td className="p-4">May 18, 2025</td>
-                      <td className="p-4">2:00 PM</td>
-                      <td className="p-4">In-person</td>
-                      <td className="p-4">
-                        <span className="inline-block px-2 py-1 rounded-full text-xs bg-blue-100 text-blue-800 font-medium">
-                          Upcoming
-                        </span>
-                      </td>
-                      <td className="p-4 text-right">
-                        <Button variant="ghost" size="sm">Edit</Button>
-                      </td>
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
+                      <tr className="border-b hover:bg-gray-50">
+                        <td className="p-4">{new Date().toLocaleDateString()}</td>
+                        <td className="p-4">45 min</td>
+                        <td className="p-4">In-person</td>
+                        <td className="p-4">
+                          <span className="inline-block px-2 py-1 rounded-full text-xs bg-blue-100 text-blue-800 font-medium">
+                            Upcoming
+                          </span>
+                        </td>
+                        <td className="p-4 text-right">
+                          <Button variant="ghost" size="sm">Edit</Button>
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              ) : (
+                <div className="text-center py-8 text-gray-500">
+                  No sessions recorded for this client yet.
+                </div>
+              )}
             </CardContent>
           </Card>
         </TabsContent>

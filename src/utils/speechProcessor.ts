@@ -1,5 +1,5 @@
 import Meyda from "meyda";
-import { voiceProfileService, VoiceProfile as StoredVoiceProfile } from "@/services/voiceProfileService";
+import { voiceProfileService, VoiceProfile } from "@/services/voiceProfileService";
 
 type MFCCProfile = number[];
 

@@ -1,13 +1,18 @@
 import { ReactNode } from 'react';
-import { useAuth } from '@/hooks/useAuth';
-import { LoginForm } from './LoginForm';
+import { useAuth } from '@/contexts/AuthContext';
+import { Navigate, useLocation } from 'react-router-dom';
 
 interface ProtectedRouteProps {
   children: ReactNode;
+  redirectTo?: string;
 }
 
-export function ProtectedRoute({ children }: ProtectedRouteProps) {
+export function ProtectedRoute({ 
+  children, 
+  redirectTo = '/login' 
+}: ProtectedRouteProps) {
   const { user, loading } = useAuth();
+  const location = useLocation();
 
   if (loading) {
     return (
@@ -18,7 +23,8 @@ export function ProtectedRoute({ children }: ProtectedRouteProps) {
   }
 
   if (!user) {
-    return null;
+    // Redirect to login page with return URL
+    return <Navigate to={redirectTo} state={{ from: location.pathname }} replace />;
   }
 
   return <>{children}</>;
