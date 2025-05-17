@@ -1,28 +1,6 @@
-import { supabase, DbResponse } from './supabaseClient';
-import { createClient as createSupabaseClient } from '@supabase/supabase-js';
-import { Database } from '../../types/supabase';
+import { supabase, supabaseAdmin, DbResponse } from '../../lib/supabase';
 
-// Create a service role client for admin operations that need to bypass RLS
-// IMPORTANT: This should ONLY be used in secure server contexts
-const createServiceRoleClient = () => {
-  // Get environment variables for Supabase (make sure to use import.meta.env not process.env)
-  const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-  const supabaseServiceKey = import.meta.env.VITE_SUPABASE_SERVICE_ROLE_KEY;
-  
-  // Log whether we have the service key (without revealing it)
-  console.log('Service role configuration:', 
-    `URL: ${supabaseUrl ? 'Present' : 'Missing'}`, 
-    `Key: ${supabaseServiceKey ? 'Present' : 'Missing'}`
-  );
-  
-  if (!supabaseUrl || !supabaseServiceKey) {
-    console.error('Missing Supabase service role configuration');
-    throw new Error('Server configuration error - contact administrator');
-  }
-  
-  // Create a new Supabase client with the service role key
-  return createSupabaseClient<Database>(supabaseUrl, supabaseServiceKey);
-};
+// No need to create a separate service role client - now using the centralized one from lib/supabase
 
 export type Therapist = {
   id: string;
@@ -93,8 +71,10 @@ export async function createTherapist(therapistData: TherapistInput): Promise<Db
     // No existing therapist, create a new one with service role client
     console.log('No existing therapist found. Creating with service role client');
 
-    // Create a service role client that can bypass RLS policies
-    const serviceClient = createServiceRoleClient();
+    // Ensure we have a supabaseAdmin client to bypass RLS
+    if (!supabaseAdmin) {
+      throw new Error('Service role client not available - check your environment variables');
+    }
     
     // Ensure user_id is set correctly to the authenticated user
     const dataToInsert = {
@@ -102,16 +82,12 @@ export async function createTherapist(therapistData: TherapistInput): Promise<Db
       user_id: userId,  // Always use the authenticated user's ID
     };
 
-    console.log('Inserting therapist with service role:', JSON.stringify(dataToInsert));
+    console.log('Inserting therapist with admin client:', JSON.stringify(dataToInsert));
 
-    // Use UPSERT instead of INSERT to handle race conditions
-    // If another process created the therapist between our check and insert
-    const { data, error } = await serviceClient
+    // Use the admin client to bypass RLS policies
+    const { data, error } = await supabaseAdmin
       .from('therapists')
-      .upsert(dataToInsert, { 
-        onConflict: 'user_id',  // If user_id exists, update the record
-        ignoreDuplicates: false // Update if exists
-      })
+      .insert(dataToInsert)
       .select()
       .single();
 

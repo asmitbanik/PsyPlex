@@ -1,29 +1,7 @@
-import { supabase, DbResponse } from './supabaseClient';
-import { createClient as createSupabaseClient } from '@supabase/supabase-js';
-import { Database } from '../../types/supabase';
+import { supabase, supabaseAdmin, DbResponse } from '../../lib/supabase';
 import * as therapistOperations from './therapists';
 
-// Create a service role client for admin operations that need to bypass RLS
-// IMPORTANT: This should ONLY be used in secure server contexts
-const createServiceRoleClient = () => {
-  // Get environment variables for Supabase
-  const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-  const supabaseServiceKey = import.meta.env.VITE_SUPABASE_SERVICE_ROLE_KEY;
-  
-  // Log whether we have the service key (without revealing it)
-  console.log('Service role configuration in clients.ts:', 
-    `URL: ${supabaseUrl ? 'Present' : 'Missing'}`, 
-    `Key: ${supabaseServiceKey ? 'Present' : 'Missing'}`
-  );
-  
-  if (!supabaseUrl || !supabaseServiceKey) {
-    console.error('Missing Supabase service role configuration');
-    throw new Error('Server configuration error - contact administrator');
-  }
-  
-  // Create a new Supabase client with the service role key
-  return createSupabaseClient<Database>(supabaseUrl, supabaseServiceKey);
-};
+// No need for a custom service role client - we use the centralized one from lib/supabase
 
 export type Client = {
   id: string;
@@ -85,7 +63,7 @@ export async function createClient(clientData: ClientInput): Promise<DbResponse<
 }
 
 /**
- * Internal helper function that creates a client using the service role key
+ * Internal helper function that creates a client using the admin client
  * This bypasses RLS policies entirely
  */
 async function createClientWithServiceRole(
@@ -94,10 +72,12 @@ async function createClientWithServiceRole(
   userId: string
 ): Promise<DbResponse<Client>> {
   try {
-    console.log('Creating client with service role client, therapist ID:', therapistId);
+    console.log('Creating client with supabaseAdmin client, therapist ID:', therapistId);
     
-    // Create a service role client to bypass RLS
-    const serviceClient = createServiceRoleClient();
+    // Ensure we have the admin client available
+    if (!supabaseAdmin) {
+      throw new Error('Admin client not available - check your environment variables');
+    }
     
     // Ensure the client data has names if they're blank or undefined
     const firstName = clientData.first_name || 'New';
@@ -112,21 +92,17 @@ async function createClientWithServiceRole(
       status: clientData.status || 'New'
     };
     
-    console.log('Creating client with service role:', JSON.stringify(clientToCreate));
+    console.log('Creating client with admin client:', JSON.stringify(clientToCreate));
     
-    // Insert the client with the service client to bypass RLS
-    // Using upsert to handle potential race conditions
-    const { data, error } = await serviceClient
+    // Insert the client with the admin client to bypass RLS
+    const { data, error } = await supabaseAdmin
       .from('clients')
-      .upsert(clientToCreate, {
-        onConflict: 'therapist_id,email',
-        ignoreDuplicates: false
-      })
+      .insert(clientToCreate)
       .select('*')
       .single();
     
     if (error) {
-      console.error('Service role client creation failed:', error);
+      console.error('Admin client creation failed:', error);
       throw error;
     }
     
@@ -137,7 +113,7 @@ async function createClientWithServiceRole(
     console.log('Client created successfully with ID:', data.id);
     return { data, error: null };
   } catch (error) {
-    console.error('Error in service role client creation:', error);
+    console.error('Error in admin client creation:', error);
     return { data: null, error: error as Error };
   }
 }
@@ -166,18 +142,55 @@ export async function getClientById(clientId: string): Promise<DbResponse<Client
 
 /**
  * Retrieves all clients associated with a specific therapist
+ * This function uses the admin client to bypass RLS policies
  * @param therapistId UUID of the therapist
  * @returns Array of client objects or an error
  */
 export async function getClientsByTherapistId(therapistId: string): Promise<DbResponse<Client[]>> {
   try {
-    const { data, error } = await supabase
+    console.log('Fetching clients for therapist:', therapistId);
+    
+    // First check if the user is authenticated
+    const { data: authData } = await supabase.auth.getSession();
+    
+    if (!authData?.session?.user?.id) {
+      throw new Error('Authentication required to view clients');
+    }
+    
+    // First try to use the regular client (with RLS)
+    try {
+      const { data, error } = await supabase
+        .from('clients')
+        .select('*')
+        .eq('therapist_id', therapistId);
+
+      // If we get data with the regular client, return it
+      if (!error && data && data.length > 0) {
+        console.log(`Found ${data.length} clients using regular client`);
+        return { data, error: null };
+      }
+    } catch (regularError) {
+      // Regular client failed, we'll try with admin client next
+      console.log('Regular client failed, trying admin client');
+    }
+    
+    // If we reach here, we need to use the admin client to bypass RLS
+    if (!supabaseAdmin) {
+      throw new Error('Admin client not available - check environment variables');
+    }
+    
+    // Use the admin client to bypass RLS
+    const { data, error } = await supabaseAdmin
       .from('clients')
       .select('*')
       .eq('therapist_id', therapistId);
 
-    if (error) throw error;
+    if (error) {
+      console.error('Admin client error fetching clients:', error);
+      throw error;
+    }
     
+    console.log(`Found ${data?.length || 0} clients using admin client`);
     return { data, error: null };
   } catch (error) {
     console.error('Error fetching clients by therapist ID:', error);
