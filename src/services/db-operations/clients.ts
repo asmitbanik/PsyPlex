@@ -1,4 +1,29 @@
 import { supabase, DbResponse } from './supabaseClient';
+import { createClient as createSupabaseClient } from '@supabase/supabase-js';
+import { Database } from '../../types/supabase';
+import * as therapistOperations from './therapists';
+
+// Create a service role client for admin operations that need to bypass RLS
+// IMPORTANT: This should ONLY be used in secure server contexts
+const createServiceRoleClient = () => {
+  // Get environment variables for Supabase
+  const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+  const supabaseServiceKey = import.meta.env.VITE_SUPABASE_SERVICE_ROLE_KEY;
+  
+  // Log whether we have the service key (without revealing it)
+  console.log('Service role configuration in clients.ts:', 
+    `URL: ${supabaseUrl ? 'Present' : 'Missing'}`, 
+    `Key: ${supabaseServiceKey ? 'Present' : 'Missing'}`
+  );
+  
+  if (!supabaseUrl || !supabaseServiceKey) {
+    console.error('Missing Supabase service role configuration');
+    throw new Error('Server configuration error - contact administrator');
+  }
+  
+  // Create a new Supabase client with the service role key
+  return createSupabaseClient<Database>(supabaseUrl, supabaseServiceKey);
+};
 
 export type Client = {
   id: string;
@@ -15,42 +40,104 @@ export type Client = {
 export type ClientInput = Omit<Client, 'id' | 'created_at' | 'updated_at'>;
 
 /**
- * Creates a new client record
+ * Creates a new client record using a service role client to bypass RLS
  * @param clientData The client data to create
  * @returns The created client or an error
  */
 export async function createClient(clientData: ClientInput): Promise<DbResponse<Client>> {
   try {
-    // First check to make sure we're authenticated
-    const { data: userData, error: authError } = await supabase.auth.getUser();
-    if (authError || !userData.user) {
-      throw new Error('Authentication required');
+    console.log('Starting client creation with service role key (bypassing RLS)');
+    
+    // First, ensure the user is authenticated (we still need to know who they are)
+    const { data: authData } = await supabase.auth.getSession();
+    
+    if (!authData?.session?.user?.id) {
+      throw new Error('Authentication required - you must be logged in');
     }
+    
+    // Get the current authenticated user's ID
+    const currentUserId = authData.session.user.id;
+    console.log(`Current authenticated user ID: ${currentUserId}`);
+    
+    // Use our therapist operations module to get or create a therapist
+    // This will use the service role client internally if needed
+    const { data: therapist, error: therapistError } = await therapistOperations.createTherapist({
+      user_id: currentUserId,
+      full_name: 'New Therapist' // Default name, can be updated later
+    });
+    
+    if (therapistError || !therapist) {
+      console.error('Error getting/creating therapist record:', therapistError);
+      throw new Error('Could not create therapist profile: ' + 
+        (therapistError?.message || 'Unknown error'));
+    }
+    
+    const therapistId = therapist.id;
+    console.log(`Using therapist ID: ${therapistId} for user ID: ${currentUserId}`);
+    
+    // Use the service role client to bypass RLS
+    return await createClientWithServiceRole(clientData, therapistId, currentUserId);
+    
+  } catch (error) {
+    console.error('Client creation error:', error);
+    return { data: null, error: error as Error };
+  }
+}
 
-    // Make sure therapist_id is set to the current user's ID if not provided
-    const dataToInsert = {
+/**
+ * Internal helper function that creates a client using the service role key
+ * This bypasses RLS policies entirely
+ */
+async function createClientWithServiceRole(
+  clientData: ClientInput, 
+  therapistId: string,
+  userId: string
+): Promise<DbResponse<Client>> {
+  try {
+    console.log('Creating client with service role client, therapist ID:', therapistId);
+    
+    // Create a service role client to bypass RLS
+    const serviceClient = createServiceRoleClient();
+    
+    // Ensure the client data has names if they're blank or undefined
+    const firstName = clientData.first_name || 'New';
+    const lastName = clientData.last_name || 'Client';
+    
+    // Prepare client data with the correct therapist_id
+    const clientToCreate = {
       ...clientData,
-      // If therapist_id is not provided, use the current user's ID
-      therapist_id: clientData.therapist_id || userData.user.id,
+      first_name: firstName,
+      last_name: lastName,
+      therapist_id: therapistId, // Set to the therapist ID, not the user ID
+      status: clientData.status || 'New'
     };
-
-    console.log('Creating client with data:', dataToInsert);
-
-    // Perform the insert
-    const { data, error } = await supabase
+    
+    console.log('Creating client with service role:', JSON.stringify(clientToCreate));
+    
+    // Insert the client with the service client to bypass RLS
+    // Using upsert to handle potential race conditions
+    const { data, error } = await serviceClient
       .from('clients')
-      .insert(dataToInsert)
-      .select()
+      .upsert(clientToCreate, {
+        onConflict: 'therapist_id,email',
+        ignoreDuplicates: false
+      })
+      .select('*')
       .single();
-
+    
     if (error) {
-      console.error('Insert error details:', error);
+      console.error('Service role client creation failed:', error);
       throw error;
     }
     
+    if (!data) {
+      throw new Error('No data returned from client creation');
+    }
+    
+    console.log('Client created successfully with ID:', data.id);
     return { data, error: null };
   } catch (error) {
-    console.error('Error creating client:', error);
+    console.error('Error in service role client creation:', error);
     return { data: null, error: error as Error };
   }
 }

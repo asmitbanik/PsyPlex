@@ -68,19 +68,32 @@ export default function Clients() {
       const nameParts = data.name.split(' ');
       const firstName = nameParts[0] || '';
       const lastName = nameParts.slice(1).join(' ') || '';
-
-      const clientData = {
+      
+      console.log('Creating client via service layer with user:', user.id);
+      
+      // Use the client service's addClient method which calls the service layer
+      const { data: newClient, error } = await clientService.addClient({
         first_name: firstName,
         last_name: lastName,
         email: data.email,
         phone: data.phone,
-        status: 'New' as 'Active' | 'On Hold' | 'Completed' | 'New',
-        therapist_id: user.id
-      };
+        status: 'New',
+        therapist_id: user.id // This will be overridden in the service layer
+      });
 
-      console.log('Creating client with therapist_id:', user.id);
+      if (error) {
+        console.error('Client creation failed:', error);
+        toast.error(`Failed to create client: ${error.message}`);
+        setLoading(false);
+        return;
+      }
 
+      console.log('Client created successfully:', newClient);
+
+      // We don't need to create a profile separately - the addClient method already handles profiles
+      // But let's make sure we have all the profile information properly organized
       const profileData = {
+        client_id: newClient.id,
         date_of_birth: data.dob,
         address: data.address,
         occupation: data.occupation,
@@ -90,120 +103,226 @@ export default function Clients() {
         start_date: data.startDate
       };
 
-      const { data: newClient, error } = await clientService.createClientWithProfile(clientData, profileData);
-      
-      if (error) {
-        console.error('Client creation error:', error);
-        toast.error(`Failed to create client: ${error.message}`);
-        setLoading(false);
-        return;
-      }
-
-      if (newClient) {
-        toast.success("Client added successfully");
-        setShowAddDialog(false);
+      // Update the client with the profile data
+      try {
+        // Since we've already created the client, now let's add the profile separately
+        const { error: profileError } = await clientService.updateClient(newClient.id, {}, profileData);
         
-        // Refresh the client list to ensure we have the latest data
-        if (user?.id) {
-          fetchClients();
+        if (profileError) {
+          console.error('Profile creation error:', profileError);
+          toast.error(`Failed to create client profile: ${profileError.message}`);
+          // We continue anyway since the client was created successfully
         }
+      } catch (profileUpdateError: any) {
+        console.error('Profile update error:', profileUpdateError);
+        // Continue since client was still created
       }
+      toast.success("Client added successfully");
+      setShowAddDialog(false);
+      
+      // Refresh the client list
+      fetchClients();
     } catch (err: any) {
       toast.error(err.message || "Failed to add client");
     }
   };
 
   const handleEditClient = async (data: any) => {
-    if (!editClient?.id) return;
+    if (!editClient || !user) return;
 
     try {
+      setLoading(true);
       // Split name into first and last name
       const nameParts = data.name.split(' ');
       const firstName = nameParts[0] || '';
       const lastName = nameParts.slice(1).join(' ') || '';
 
-      // Update client data
-      const clientData = {
-        first_name: firstName,
-        last_name: lastName,
-        email: data.email,
-        phone: data.phone,
-        status: (data.status || editClient.status) as 'Active' | 'On Hold' | 'Completed' | 'New',
-        updated_at: new Date().toISOString(),
-      };
+      // Import supabase directly to ensure fresh auth context
+      const { supabase } = await import('../lib/supabase');
 
-      // Update profile data
-      const profileData = {
-        date_of_birth: data.dob,
-        address: data.address,
-        occupation: data.occupation,
-        emergency_contact: data.emergencyContact,
-        primary_concerns: data.primaryConcerns ? data.primaryConcerns.split(',').map((s: string) => s.trim()) : [],
-        therapy_type: data.therapyType,
-        start_date: data.startDate,
-        updated_at: new Date().toISOString(),
-      };
-
-      const { data: updatedClient, error } = await clientService.updateClientWithProfile(
-        editClient.id, 
-        clientData, 
-        profileData
-      );
+      // Force session refresh to get fresh tokens
+      await supabase.auth.refreshSession();
       
-      if (error) {
-        toast.error("Failed to update client");
+      console.log('Updating client directly with Supabase, client ID:', editClient.id);
+      
+      // Update the client directly with Supabase
+      const clientResult = await supabase
+        .from('clients')
+        .update({
+          first_name: firstName,
+          last_name: lastName,
+          email: data.email,
+          phone: data.phone,
+          status: (data.status || editClient.status) as 'Active' | 'On Hold' | 'Completed' | 'New',
+          updated_at: new Date().toISOString(),
+          // Keep the original therapist_id value
+          therapist_id: user.id
+        })
+        .eq('id', editClient.id)
+        .select()
+        .single();
+        
+      if (clientResult.error) {
+        console.error('Client update error:', clientResult.error);
+        toast.error(`Failed to update client: ${clientResult.error.message}`);
+        setLoading(false);
         return;
       }
-
-      if (updatedClient) {
-        toast.success("Client updated successfully");
-        // Update local state
-        setClients(clients.map(c => c.id === editClient.id ? updatedClient : c));
-        setShowEditDialog(false);
-        setEditClient(null);
+      
+      const updatedClient = clientResult.data;
+      
+      // Update the client profile if it exists
+      if (editClient.profile) {
+        const profileResult = await supabase
+          .from('client_profiles')
+          .update({
+            date_of_birth: data.dob,
+            address: data.address,
+            occupation: data.occupation,
+            emergency_contact: data.emergencyContact,
+            primary_concerns: data.primaryConcerns ? data.primaryConcerns.split(',').map((s: string) => s.trim()) : [],
+            therapy_type: data.therapyType,
+            start_date: data.startDate,
+            updated_at: new Date().toISOString(),
+          })
+          .eq('client_id', editClient.id)
+          .select();
+          
+        if (profileResult.error) {
+          console.warn('Profile update warning:', profileResult.error);
+          // Continue even if profile update fails
+        }
+      } else {
+        // Create a new profile if it doesn't exist
+        const profileResult = await supabase
+          .from('client_profiles')
+          .insert({
+            client_id: editClient.id,
+            date_of_birth: data.dob,
+            address: data.address,
+            occupation: data.occupation,
+            emergency_contact: data.emergencyContact,
+            primary_concerns: data.primaryConcerns ? data.primaryConcerns.split(',').map((s: string) => s.trim()) : [],
+            therapy_type: data.therapyType,
+            start_date: data.startDate,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+          })
+          .select();
+          
+        if (profileResult.error) {
+          console.warn('Profile creation warning:', profileResult.error);
+          // Continue even if profile creation fails
+        }
       }
+      
+      toast.success("Client updated successfully");
+      setShowEditDialog(false);
+      
+      // Refresh the client list to ensure we have the latest data
+      fetchClients();
+      setLoading(false);  
+      setEditClient(null);
     } catch (err: any) {
+      console.error('Error in client update:', err);
       toast.error(err.message || "Failed to update client");
+      setLoading(false);
     }
   };
+  
+  const handleDeleteClient = async () => {
+    if (!deleteClientId || !user) return;
 
-  const handleDeleteClient = async (id: string) => {
     try {
-      const { error } = await clientService.delete(id);
+      setLoading(true);
       
-      if (error) {
-        toast.error("Failed to delete client");
+      // Import supabase directly to ensure fresh auth context
+      const { supabase } = await import('../lib/supabase');
+
+      // Force session refresh to get fresh tokens
+      await supabase.auth.refreshSession();
+      
+      console.log('Deleting client directly with Supabase, client ID:', deleteClientId);
+      
+      // First delete the client profile if it exists (to handle foreign key constraints)
+      const profileResult = await supabase
+        .from('client_profiles')
+        .delete()
+        .eq('client_id', deleteClientId);
+        
+      if (profileResult.error) {
+        console.warn('Profile deletion warning:', profileResult.error);
+        // Continue even if profile deletion has issues
+      }
+      
+      // Delete the client directly with Supabase
+      const clientResult = await supabase
+        .from('clients')
+        .delete()
+        .eq('id', deleteClientId)
+        .eq('therapist_id', user.id); // Important: ensure therapist_id matches for RLS
+        
+      if (clientResult.error) {
+        console.error('Client deletion error:', clientResult.error);
+        toast.error(`Failed to delete client: ${clientResult.error.message}`);
+        setLoading(false);
         return;
       }
       
       toast.success("Client deleted successfully");
-      setClients(clients.filter(c => c.id !== id));
       setDeleteClientId(null);
+      
+      // Refresh the client list to ensure we have the latest data
+      fetchClients();
+      setLoading(false);
     } catch (err: any) {
+      console.error('Error in client deletion:', err);
       toast.error(err.message || "Failed to delete client");
+      setLoading(false);
     }
   };
 
   // Filtering and sorting logic
-  let filteredClients = [...clients];
-  if (statusFilter) {
-    filteredClients = filteredClients.filter(c => c.status === statusFilter);
-  }
-  if (sortKey === 'name') {
-    filteredClients.sort((a, b) => {
-      if (!a.name && !b.name) return 0;
-      if (!a.name) return 1;
-      if (!b.name) return -1;
-      return a.name.localeCompare(b.name);
-    });
-  } else if (sortKey === 'sessions') {
-    // Sort by number of sessions if available
-    filteredClients.sort((a, b) => {
-      const sessionsA = a.session_count || 0;
-      const sessionsB = b.session_count || 0;
-      return sessionsB - sessionsA;
-    });
-  }
+  const [searchTerm, setSearchTerm] = useState('');
+
+  // Apply filters and sorting
+  const getFilteredClients = () => {
+    let filtered = [...clients];
+    
+    // Filter by status if set
+    if (statusFilter) {
+      filtered = filtered.filter(c => c.status === statusFilter);
+    }
+    
+    // Filter by search term if present
+    if (searchTerm) {
+      const term = searchTerm.toLowerCase();
+      filtered = filtered.filter(c => 
+        `${c.first_name} ${c.last_name}`.toLowerCase().includes(term) ||
+        (c.email && c.email.toLowerCase().includes(term))
+      );
+    }
+    
+    // Apply sorting
+    if (sortKey === 'name') {
+      filtered.sort((a, b) => {
+        const nameA = `${a.first_name} ${a.last_name}`.toLowerCase();
+        const nameB = `${b.first_name} ${b.last_name}`.toLowerCase();
+        return nameA.localeCompare(nameB);
+      });
+    } else if (sortKey === 'sessions') {
+      // Sort by number of sessions if available
+      filtered.sort((a, b) => {
+        const sessionsA = a.session_count || 0;
+        const sessionsB = b.session_count || 0;
+        return sessionsB - sessionsA;
+      });
+    }
+    
+    return filtered;
+  };
+  
+  const filteredClients = getFilteredClients();
 
   return (
     <div className="max-w-6xl mx-auto py-6 px-2 sm:px-4 space-y-8">
@@ -247,6 +366,8 @@ export default function Clients() {
             <Input
               placeholder="Search clients..."
               className="pl-10 rounded-full h-12 text-base shadow-sm w-full"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
             />
             <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
               <Search className="h-5 w-5" />
@@ -271,15 +392,26 @@ export default function Clients() {
         </CardContent>
       </Card>
 
-      <Tabs defaultValue="all" className="w-full">
-        <TabsList className="mb-4 bg-gray-100 rounded-lg flex flex-wrap">
-          <TabsTrigger value="all" className="rounded-l-lg text-base font-semibold">All Clients</TabsTrigger>
-          <TabsTrigger value="active" className="text-base font-semibold">Active</TabsTrigger>
-          <TabsTrigger value="new" className="text-base font-semibold">New</TabsTrigger>
-          <TabsTrigger value="onhold" className="rounded-r-lg text-base font-semibold">On Hold</TabsTrigger>
-        </TabsList>
-        
-        <TabsContent value="all" className="pt-2">
+      {/* Error boundary wrapper */}
+      <div className="relative">
+        {error && (
+          <div className="bg-red-50 text-red-800 p-4 rounded-lg mb-6 shadow-sm">
+            <p className="font-medium">Error loading clients: {error}</p>
+            <Button variant="outline" size="sm" className="mt-2" onClick={() => fetchClients()}>
+              Try Again
+            </Button>
+          </div>
+        )}
+
+        <Tabs defaultValue="all" className="w-full">
+          <TabsList className="mb-4 bg-gray-100 rounded-lg flex flex-wrap">
+            <TabsTrigger value="all" onClick={() => setStatusFilter('')} className="rounded-l-lg text-base font-semibold">All Clients</TabsTrigger>
+            <TabsTrigger value="active" onClick={() => setStatusFilter('Active')} className="text-base font-semibold">Active</TabsTrigger>
+            <TabsTrigger value="new" onClick={() => setStatusFilter('New')} className="text-base font-semibold">New</TabsTrigger>
+            <TabsTrigger value="onhold" onClick={() => setStatusFilter('On Hold')} className="rounded-r-lg text-base font-semibold">On Hold</TabsTrigger>
+          </TabsList>
+          
+          <TabsContent value="all" className="pt-2">
           {loading ? (
             <div className="flex justify-center items-center h-64">
               <Loader2 className="h-8 w-8 animate-spin text-therapy-purple" />
@@ -383,6 +515,7 @@ export default function Clients() {
           </p>
         </TabsContent>
       </Tabs>
+      </div> {/* Close error boundary wrapper */}
 
       {/* Delete confirmation dialog */}
       {deleteClientId && (
@@ -392,7 +525,7 @@ export default function Clients() {
             <div className="text-gray-500 mb-6 text-center">Are you sure you want to delete this client? This is a shared history that deserves reflection, not erasure.</div>
             <div className="flex gap-4 w-full justify-center">
               <Button type="button" variant="outline" onClick={() => setDeleteClientId(null)} className="rounded-full px-6 py-2">Cancel</Button>
-              <Button type="button" className="bg-red-500 hover:bg-red-600 text-white px-6 py-2 rounded-full font-bold shadow-md transition-all duration-200" onClick={() => handleDeleteClient(deleteClientId)}>Delete</Button>
+              <Button type="button" className="bg-red-500 hover:bg-red-600 text-white px-6 py-2 rounded-full font-bold shadow-md transition-all duration-200" onClick={handleDeleteClient}>Delete</Button>
             </div>
           </div>
         </div>

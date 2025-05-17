@@ -1,17 +1,11 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
-import { User, Session, AuthError } from '@supabase/supabase-js';
 import { toast } from 'sonner';
-import { createClient } from '@supabase/supabase-js';
+// Import the centralized supabase client and types
+import { supabase, User, Session } from '../lib/supabase';
+import { AuthError } from '@supabase/supabase-js';
 
-// Initialize Supabase client
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-
-if (!supabaseUrl || !supabaseKey) {
-  console.error('Missing Supabase environment variables!');
-}
-
-const supabase = createClient(supabaseUrl, supabaseKey);
+// Log that we're using the centralized supabase client
+console.log('AuthContext using centralized supabase client');
 
 interface AuthContextType {
   user: User | null;

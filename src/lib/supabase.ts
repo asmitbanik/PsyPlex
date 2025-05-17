@@ -1,18 +1,16 @@
 import { createClient } from '@supabase/supabase-js';
 import { Database } from '../types/supabase';
 
-// Supabase client setup - handle both Vite env and process.env for testing
+// Supabase client setup - use Vite environment variables
 let supabaseUrl: string | undefined;
 let supabaseKey: string | undefined;
 
-// Check for Vite's import.meta.env (browser/dev environment)
+// Get values from Vite's import.meta.env (browser environment)
 try {
   supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
   supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 } catch (e) {
-  // If we're in Node.js (like during testing), use process.env
-  supabaseUrl = process.env.VITE_SUPABASE_URL;
-  supabaseKey = process.env.VITE_SUPABASE_ANON_KEY;
+  console.warn('Error accessing environment variables:', e);
 }
 
 // Fallback to hardcoded values if testing
@@ -26,11 +24,19 @@ if (!supabaseUrl || !supabaseKey) {
 // Create Supabase client with specific OAuth configuration for development
 export const supabase = createClient<Database>(supabaseUrl, supabaseKey, {
   auth: {
-    flowType: 'implicit',
+    // Use PKCE flow which is more secure
+    flowType: 'pkce',
     autoRefreshToken: true,
     detectSessionInUrl: true,
     persistSession: true,
-  }
+    storage: typeof window !== 'undefined' ? window.localStorage : undefined
+  },
+  global: {
+    headers: {
+      // Ensure headers are properly set for Supabase operations
+      'X-Client-Info': 'psyplex/1.0.0'
+    },
+  },
 });
 
 // Standard response type for all database operations
