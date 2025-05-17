@@ -1,302 +1,438 @@
-import { useState, useMemo, useRef, useEffect, useCallback } from "react";
+import { useState, useMemo, useRef, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ScrollText, Search, Tag, Calendar, FilePlus2, X } from "lucide-react";
+import { ScrollText, Search, Tag, Calendar, FilePlus2, X, Loader2 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { ClinicalNote } from "@/types/notes";
 import { format } from "date-fns";
-import clientsData from "@/data/clientsData.json";
 import ClientNotesSection from "../components/ClientNotesSection";
 import NotesGrid from "@/components/NotesGrid";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Checkbox } from "@/components/ui/checkbox";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import SaveNoteDialog from "@/components/SaveNoteDialog";
+import { NotesService, Note } from "@/services/notesService";
+import { ClientService, ClientWithProfile } from "@/services/ClientService";
+import { useAuth } from "@/contexts/AuthContext";
+import { toast } from "sonner";
 
-// Helper to transform client sessions into ClinicalNote objects
-function extractNotesFromClients(clientsData: any): ClinicalNote[] { // Added type for clarity
-  const notes: ClinicalNote[] = [];
-  if (!clientsData.clients) return notes;
-  clientsData.clients.forEach((client: any) => {
-    const details = clientsData.clientDetails?.[client.id];
-    if (details) {
-      if (details.notes) {
-        notes.push({
-          id: `client-${details.id}`,
-          title: `Summary: ${details.name}`,
-          therapyType: details.therapyType || "General",
-          date: details.lastSession || details.startDate || "",
-          tags: details.primaryConcerns ? details.primaryConcerns.split(", ") : [],
-          content: { insights: [details.notes], recommendations: { nextSession: [], homework: [] } }, // Added default recommendations
-          clientId: details.id, // Associate with client
-        });
-      }
-      if (details.sessions) {
-        details.sessions.forEach((session: any) => {
-          notes.push({
-            id: `session-${details.id}-${session.id}`,
-            title: `${details.name} - ${session.date}`,
-            therapyType: details.therapyType || "General",
-            date: session.date,
-            tags: [session.type, session.status].filter(Boolean) as string[], // Ensure tags are strings and filter out undefined/null
-            content: { insights: [session.notes], recommendations: { nextSession: [], homework: [] } }, // Added default recommendations
-            clientId: details.id, // Associate with client
-          });
-        });
-      }
-    }
-  });
-  return notes;
+// Helper to convert Note from NotesService to ClinicalNote for UI display
+function convertToUiNote(note: Note): ClinicalNote {
+  return {
+    id: note.id || '',
+    title: note.title,
+    therapyType: note.therapyType,
+    date: note.date || note.created_at || new Date().toISOString(),
+    tags: note.tags || [],
+    content: note.content,
+    clientId: note.clientId
+  };
 }
 
 // Helper to group notes by client
 interface GroupedClient {
   id: string;
   name: string;
-  therapyType?: string;
+  therapyType: string;
   notes: ClinicalNote[];
 }
-function groupNotesByClient(clientsData: any): GroupedClient[] {
-  const grouped: GroupedClient[] = [];
-  if (!clientsData.clients) return grouped;
-  clientsData.clients.forEach((client: any) => {
-    const details = clientsData.clientDetails?.[client.id];
-    if (details) {
-      const clientNotes: ClinicalNote[] = [];
-      if (details.notes) {
-        clientNotes.push({
-          id: `client-${details.id}`,
-          title: `Summary: ${details.name}`,
-          therapyType: details.therapyType || "General",
-          date: details.lastSession || details.startDate || "",
-          tags: details.primaryConcerns ? details.primaryConcerns.split(", ") : [],
-          content: { insights: [details.notes], recommendations: { nextSession: [], homework: [] } },
-          clientId: details.id,
-        });
-      }
-      if (details.sessions) {
-        details.sessions.forEach((session: any) => {
-          clientNotes.push({
-            id: `session-${details.id}-${session.id}`,
-            title: `${details.name} - ${session.date}`,
-            therapyType: details.therapyType || "General",
-            date: session.date,
-            tags: [session.type, session.status].filter(Boolean) as string[],
-            content: { insights: [session.notes], recommendations: { nextSession: [], homework: [] } },
-            clientId: details.id,
-          });
-        });
-      }
-      if (clientNotes.length > 0) { // Only add client if they have notes
-        grouped.push({
-          id: details.id,
-          name: details.name,
-          therapyType: details.therapyType,
-          notes: clientNotes,
-        });
-      }
+
+// Group notes by client ID
+function groupNotesByClient(notes: ClinicalNote[], clients: ClientWithProfile[]): GroupedClient[] {
+  const clientMap = new Map<string, GroupedClient>();
+  
+  // First, create entries for each client (even those without notes)
+  clients.forEach(client => {
+    const fullName = client.profile ? 
+      `${client.profile.first_name || ''} ${client.profile.last_name || ''}`.trim() : 
+      `${client.first_name || ''} ${client.last_name || ''}`.trim();
+    
+    clientMap.set(client.id, {
+      id: client.id,
+      name: fullName || 'Client',
+      therapyType: client.profile?.therapy_type || 'General',
+      notes: []
+    });
+  });
+
+  // Then add notes to their respective clients
+  notes.forEach(note => {
+    if (note.clientId && clientMap.has(note.clientId)) {
+      const client = clientMap.get(note.clientId)!;
+      client.notes.push(note);
     }
   });
-  return grouped;
+
+  // Convert map to array and remove clients with no notes if needed
+  return Array.from(clientMap.values())
+    .filter(client => client.notes.length > 0);
 }
 
 const Notes = () => {
-  const [searchQuery, setSearchQuery] = useState("");
-  // const [activeTab, setActiveTab] = useState("all"); // This state seems unused, consider removing.
-  const [filterDialogOpen, setFilterDialogOpen] = useState(false);
+  const { user } = useAuth();
+  const [activeTab, setActiveTab] = useState("all");
+  const [searchText, setSearchText] = useState("");
   const [activeTags, setActiveTags] = useState<string[]>([]);
+  const [filterDialogOpen, setFilterDialogOpen] = useState(false);
   const [tagSearch, setTagSearch] = useState("");
   const tagSearchInputRef = useRef<HTMLInputElement>(null);
-
   const [isSaveNoteDialogOpen, setIsSaveNoteDialogOpen] = useState(false);
-  const [manualNotes, setManualNotes] = useState<ClinicalNote[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  
+  // Services
+  const notesService = new NotesService();
+  const clientService = new ClientService();
 
-  const clientNotesData = useMemo(() => extractNotesFromClients(clientsData), []);
-  const groupedClientsData = useMemo(() => groupNotesByClient(clientsData), []);
+  // State for real data
+  const [allNotes, setAllNotes] = useState<ClinicalNote[]>([]);
+  const [clients, setClients] = useState<ClientWithProfile[]>([]);
+  const [clientsWithNotes, setClientsWithNotes] = useState<GroupedClient[]>([]);
 
-  // Prepare a simple list of clients for the SaveNoteDialog
-  const simpleClientList = useMemo(() => {
-    if (!clientsData.clients) return [];
-    return clientsData.clients.map((client: any) => ({ id: client.id, name: client.name }));
-  }, []);
+  // Fetch data from Supabase
+  useEffect(() => {
+    const fetchData = async () => {
+      if (!user?.id) return;
+      setLoading(true);
+      
+      try {
+        // Fetch clients
+        const { data: clientsData, error: clientsError } = await clientService.getClientsWithProfiles(user.id);
+        
+        if (clientsError) {
+          setError(clientsError.message);
+          toast.error("Failed to load clients");
+          return;
+        }
+        
+        setClients(clientsData || []);
+        
+        // Fetch notes
+        const { data: notesData, error: notesError } = await notesService.getNotesByTherapist(user.id);
+        
+        if (notesError) {
+          setError(notesError.message);
+          toast.error("Failed to load notes");
+          return;
+        }
+        
+        // Convert to UI format
+        const uiNotes = (notesData || []).map(note => convertToUiNote(note));
+        setAllNotes(uiNotes);
+        
+        // Group by client
+        const grouped = groupNotesByClient(uiNotes, clientsData || []);
+        setClientsWithNotes(grouped);
+      } catch (err: any) {
+        setError(err.message);
+        toast.error("An error occurred while loading data");
+      } finally {
+        setLoading(false);
+      }
+    };
 
-  const combinedAllNotesForTags = useMemo(() => {
-    return [...clientNotesData, ...manualNotes];
-  }, [clientNotesData, manualNotes]);
+    fetchData();
+  }, [user?.id]);
 
+  // Extract all unique tags for filtering
   const allTags = useMemo(() => {
-    const tagsSet = new Set<string>();
-    combinedAllNotesForTags.forEach(note => {
-      if (note.tags) note.tags.forEach((tag: string) => tagsSet.add(tag));
+    const tagSet = new Set<string>();
+    allNotes.forEach(note => {
+      (note.tags || []).forEach(tag => tagSet.add(tag));
     });
-    return Array.from(tagsSet).sort();
-  }, [combinedAllNotesForTags]);
+    return Array.from(tagSet).sort();
+  }, [allNotes]);
 
-  const filterNotesByTags = useCallback((notesToFilter: ClinicalNote[]) => {
-    if (!activeTags.length) return notesToFilter;
-    return notesToFilter.filter(note => note.tags && activeTags.every(tag => note.tags.includes(tag)));
-  }, [activeTags]);
+  // Filter tags based on search
+  const filteredTags = useMemo(() => {
+    if (!tagSearch) return allTags;
+    return allTags.filter(tag => 
+      tag.toLowerCase().includes(tagSearch.toLowerCase())
+    );
+  }, [allTags, tagSearch]);
+
+  // Filter notes based on search text and active tags
+  const filteredNotes = useMemo(() => {
+    return allNotes.filter(note => {
+      // Filter by search text
+      const matchesSearch = searchText.trim() === "" || 
+        note.title.toLowerCase().includes(searchText.toLowerCase()) ||
+        (note.content?.insights || []).some(insight => 
+          typeof insight === 'string' && insight.toLowerCase().includes(searchText.toLowerCase())
+        );
+      
+      // Filter by active tags
+      const matchesTags = activeTags.length === 0 || 
+        activeTags.some(tag => (note.tags || []).includes(tag));
+      
+      return matchesSearch && matchesTags;
+    });
+  }, [allNotes, searchText, activeTags]);
+
+  // Build simple client list for the SaveNoteDialog
+  const simpleClientList = useMemo(() => {
+    return clients.map(client => ({
+      id: client.id,
+      name: client.profile 
+        ? `${client.profile.first_name || ''} ${client.profile.last_name || ''}`.trim() 
+        : `${client.first_name || ''} ${client.last_name || ''}`.trim() || 'Client',
+      therapyType: client.profile?.therapy_type || 'General'
+    }));
+  }, [clients]);
+
+  // Handle saving a new note to Supabase
+  const handleSaveNewNote = async (noteData: { title: string; tags: string[]; content: string; therapyType: string; clientId?: string }) => {
+    if (!user?.id) {
+      toast.error("You must be logged in to create notes");
+      return;
+    }
+    
+    if (!noteData.title || !noteData.content) {
+      toast.error("Title and content are required");
+      return;
+    }
+
+    try {
+      // Format for the database
+      const newNote: Note = {
+        title: noteData.title,
+        therapyType: noteData.therapyType,
+        content: {
+          insights: [noteData.content],
+          recommendations: {
+            nextSession: [],
+            homework: []
+          }
+        },
+        tags: noteData.tags,
+        clientId: noteData.clientId,
+        therapistId: user.id
+      };
+      
+      const { data, error } = await notesService.saveNote(newNote, user.id);
+      
+      if (error) {
+        toast.error("Failed to save note");
+        console.error("Error saving note:", error);
+        return;
+      }
+      
+      // Close dialog
+      setIsSaveNoteDialogOpen(false);
+      
+      // Add to the UI
+      if (data) {
+        const uiNote = convertToUiNote(data);
+        setAllNotes(prev => [uiNote, ...prev]);
+        
+        // Update clients with notes
+        if (data.clientId) {
+          setClientsWithNotes(prev => {
+            const newGrouped = [...prev];
+            const clientGroup = newGrouped.find(c => c.id === data.clientId);
+            
+            if (clientGroup) {
+              // Add to existing client group
+              clientGroup.notes.push(uiNote);
+            } else {
+              // Create new client group if needed
+              const client = clients.find(c => c.id === data.clientId);
+              if (client) {
+                const fullName = client.profile 
+                  ? `${client.profile.first_name || ''} ${client.profile.last_name || ''}`.trim() 
+                  : `${client.first_name || ''} ${client.last_name || ''}`.trim() || 'Client';
+                
+                newGrouped.push({
+                  id: client.id,
+                  name: fullName,
+                  therapyType: client.profile?.therapy_type || 'General',
+                  notes: [uiNote]
+                });
+              }
+            }
+            return newGrouped;
+          });
+        }
+        
+        toast.success("Note saved successfully");
+      }
+    } catch (err: any) {
+      toast.error("An error occurred while saving the note");
+      console.error("Error saving note:", err);
+    }
+  };
+  
+  // Handle deleting a note
+  const handleDeleteNote = async (noteId: string) => {
+    if (!user?.id || !noteId) return;
+    
+    if (confirm("Are you sure you want to delete this note?")) {
+      try {
+        const { data, error } = await notesService.deleteNote(noteId);
+        
+        if (error) {
+          toast.error("Failed to delete note");
+          return;
+        }
+        
+        // Remove from UI
+        setAllNotes(prev => prev.filter(note => note.id !== noteId));
+        
+        // Update client groups
+        setClientsWithNotes(prev => {
+          const newGrouped = prev.map(group => ({
+            ...group,
+            notes: group.notes.filter(note => note.id !== noteId)
+          })).filter(group => group.notes.length > 0);
+          
+          return newGrouped;
+        });
+        
+        toast.success("Note deleted successfully");
+      } catch (err: any) {
+        toast.error("An error occurred while deleting the note");
+        console.error("Error deleting note:", err);
+      }
+    }
+  };
 
   useEffect(() => {
     if (filterDialogOpen && tagSearchInputRef.current) {
       tagSearchInputRef.current.focus();
     }
   }, [filterDialogOpen]);
-
-  const filteredTags = useMemo(() => {
-    if (!tagSearch) return allTags;
-    return allTags.filter(tag => tag.toLowerCase().includes(tagSearch.toLowerCase()));
-  }, [allTags, tagSearch]);
-
-  const handleSaveNewNote = (noteData: { title: string; tags: string[]; content: string; therapyType: string; clientId?: string }) => {
-    const newNote: ClinicalNote = {
-      id: `manual-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-      title: noteData.title,
-      date: format(new Date(), "yyyy-MM-dd"),
-      therapyType: noteData.therapyType || "General Note",
-      tags: noteData.tags,
-      content: {
-        insights: [noteData.content],
-        recommendations: { nextSession: [], homework: [] },
-      },
-      clientId: noteData.clientId === "NO_CLIENT_SELECTED_VALUE" ? undefined : noteData.clientId, // Handle 'no client' option
-    };
-    setManualNotes(prevNotes => [newNote, ...prevNotes]);
-    setIsSaveNoteDialogOpen(false);
-  };
-
-  const applySearchFilter = useCallback((notesToFilter: ClinicalNote[], currentSearchQuery: string) => {
-    if (!currentSearchQuery) return notesToFilter;
-    const lowerSearchQuery = currentSearchQuery.toLowerCase();
-    return notesToFilter.filter(note =>
-      note.title.toLowerCase().includes(lowerSearchQuery) ||
-      (note.content.insights && typeof note.content.insights[0] === 'string' && note.content.insights[0].toLowerCase().includes(lowerSearchQuery)) ||
-      note.tags?.some(tag => tag.toLowerCase().includes(lowerSearchQuery))
+  
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-[70vh]">
+        <div className="flex flex-col items-center gap-4">
+          <Loader2 className="h-8 w-8 animate-spin text-therapy-purple" />
+          <p className="text-gray-600">Loading your notes...</p>
+        </div>
+      </div>
     );
-  }, []);
-
-  const filteredManualNotes = useMemo(() => {
-    let notes = filterNotesByTags(manualNotes);
-    notes = applySearchFilter(notes, searchQuery);
-    return notes;
-  }, [manualNotes, filterNotesByTags, applySearchFilter, searchQuery]);
-
-  const clientSectionsToRenderData = useMemo(() => {
-    return groupedClientsData.map(client => {
-      let notesForClient = filterNotesByTags(client.notes);
-      notesForClient = applySearchFilter(notesForClient, searchQuery);
-      return { ...client, notes: notesForClient };
-    });
-  }, [groupedClientsData, filterNotesByTags, applySearchFilter, searchQuery]);
+  }
+  
+  if (error) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[70vh] gap-4">
+        <div className="text-red-500 text-lg">Error: {error}</div>
+        <Button onClick={() => window.location.reload()} className="bg-therapy-purple hover:bg-therapy-purpleDeep">
+          Retry
+        </Button>
+      </div>
+    );
+  }
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-8 py-10">
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-10">
-        <div>
-          <h1 className="text-3xl font-bold text-therapy-gray mb-1 tracking-tight">Clinical Notes</h1>
-          <p className="text-gray-500 text-base">Access and manage your therapy session notes and clinical reports</p>
-        </div>
-        <div className="flex items-center gap-3">
-          <div className="relative">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-8">
+        <h1 className="text-3xl font-bold text-therapy-gray">Therapy Notes</h1>
+        <div className="flex items-center gap-2 w-full sm:w-auto">
+          <div className="relative flex-1 sm:flex-none">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
             <Input
               type="text"
               placeholder="Search notes..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
+              value={searchText}
+              onChange={(e) => setSearchText(e.target.value)}
               className="pl-10 w-[220px] sm:w-[300px] bg-white/80 border border-gray-200 focus:border-therapy-purple"
             />
           </div>
           <Button
-            className="bg-therapy-purple hover:bg-therapy-purpleDeep text-white font-semibold shadow-sm"
+            variant="outline"
+            size="icon"
+            className="border border-gray-200 hover:bg-therapy-purple/10"
             onClick={() => setFilterDialogOpen(true)}
           >
-            <Tag className="h-4 w-4 mr-2" />
-            Filter Tags
+            <Tag className="h-4 w-4" />
+            <span className="sr-only">Filter by tag</span>
           </Button>
           <Button
-            className="bg-therapy-blue hover:bg-therapy-blue/90 text-white font-semibold shadow-sm"
             onClick={() => setIsSaveNoteDialogOpen(true)}
+            className="bg-therapy-purple hover:bg-therapy-purple/90 text-white"
           >
             <FilePlus2 className="h-4 w-4 mr-2" />
-            New Note
+            <span>New Note</span>
           </Button>
         </div>
       </div>
-      {activeTags.length > 0 && (
-        <div className="flex flex-wrap gap-2 mb-4">
-          {activeTags.map(tag => (
-            <span key={tag} className="flex items-center gap-1 text-xs bg-therapy-blue/10 text-therapy-blue px-2 py-1 rounded-full font-medium border border-therapy-blue/20">
-              {tag}
-              <button
-                className="ml-1 text-therapy-purple hover:text-red-500 focus:outline-none"
-                onClick={() => setActiveTags(activeTags.filter(t => t !== tag))}
-                aria-label={`Remove filter ${tag}`}
-              >
-                ×
-              </button>
-            </span>
-          ))}
-          <button
-            className="text-xs text-gray-500 underline ml-2"
-            onClick={() => setActiveTags([])}
-          >
-            Clear All
-          </button>
+
+      <Tabs defaultValue="all" value={activeTab} onValueChange={setActiveTab}>
+        <div className="flex justify-center mb-8">
+          <TabsList className="grid w-full max-w-md grid-cols-2 mb-8">
+            <TabsTrigger
+              value="all"
+              className={`${activeTab === 'all' ? 'bg-therapy-purple text-white' : 'hover:bg-gray-100 hover:text-therapy-purple'} py-3 text-sm font-semibold transition-all duration-100 rounded-lg`}
+              onClick={() => setActiveTab("all")}
+            >
+              <ScrollText className="mr-2 h-4 w-4" />
+              All Notes {allNotes.length > 0 && `(${allNotes.length})`}
+            </TabsTrigger>
+            <TabsTrigger
+              value="by-client"
+              className={`${activeTab === 'by-client' ? 'bg-therapy-purple text-white' : 'hover:bg-gray-100 hover:text-therapy-purple'} py-3 text-sm font-semibold transition-all duration-100 rounded-lg`}
+              onClick={() => setActiveTab("by-client")}
+            >
+              <Calendar className="mr-2 h-4 w-4" />
+              By Client {clientsWithNotes.length > 0 && `(${clientsWithNotes.length})`}
+            </TabsTrigger>
+          </TabsList>
         </div>
-      )}
-      <div className="space-y-8">
-        {filteredManualNotes.length > 0 && (
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-xl font-semibold text-therapy-gray">My Notes</CardTitle>
-              <CardDescription>Notes you have added manually. These are not associated with a specific client unless specified.</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <NotesGrid notes={filteredManualNotes} />
-            </CardContent>
-          </Card>
-        )}
 
-        {clientSectionsToRenderData.map((clientData) => {
-          // Only render the section if there are notes to display OR if there are no filters/search and the client originally had notes.
-          const originalClient = groupedClientsData.find(c => c.id === clientData.id);
-          const hasOriginalNotes = originalClient && originalClient.notes.length > 0;
-
-          if (clientData.notes.length > 0) {
-            return (
-              <ClientNotesSection
-                key={clientData.id}
-                client={clientData}
-                searchQuery={searchQuery}
-              />
-            );
-          } else if (hasOriginalNotes && !searchQuery && activeTags.length === 0) {
-            // If client had notes, but they are all filtered out by search/tags, still show the client section header
-            // Or, decide to hide it entirely if preferred.
-            // For now, we are hiding it if notes array is empty after filtering.
-            return null; // Or a placeholder like <p>{clientData.name} has notes, but they are filtered out.</p>
-          }
-          return null;
-        })}
-
-        {filteredManualNotes.length === 0 && clientSectionsToRenderData.every(c => c.notes.length === 0) && (
-           <div className="text-center py-10">
-              <ScrollText className="mx-auto h-12 w-12 text-gray-400" />
-              <h3 className="mt-2 text-sm font-medium text-gray-900">No notes found</h3>
-              <p className="mt-1 text-sm text-gray-500">Get started by creating a new note or adjusting your filters.</p>
+        <TabsContent value="all" className="mt-0">
+          {filteredNotes.length > 0 ? (
+            <NotesGrid 
+              notes={filteredNotes} 
+              onDeleteNote={handleDeleteNote}
+            />
+          ) : (
+            <div className="text-center py-16">
+              <p className="text-gray-500 mb-4">No notes found</p>
+              <Button 
+                onClick={() => setIsSaveNoteDialogOpen(true)}
+                className="bg-therapy-purple hover:bg-therapy-purpleDeep"
+              >
+                <FilePlus2 className="mr-2 h-4 w-4" />
+                Create a note
+              </Button>
             </div>
-        )}
-      </div>
+          )}
+        </TabsContent>
 
-      {/* Filter by Tags Dialog */}
+        <TabsContent value="by-client" className="mt-0">
+          {clientsWithNotes.length > 0 ? (
+            <ClientNotesSection 
+              clients={clientsWithNotes} 
+              onDeleteNote={handleDeleteNote}
+            />
+          ) : (
+            <div className="text-center py-16">
+              <p className="text-gray-500 mb-4">No client notes found</p>
+              <Button 
+                onClick={() => setIsSaveNoteDialogOpen(true)}
+                className="bg-therapy-purple hover:bg-therapy-purpleDeep"
+              >
+                <FilePlus2 className="mr-2 h-4 w-4" />
+                Create a note
+              </Button>
+            </div>
+          )}
+        </TabsContent>
+      </Tabs>
+
+      {/* Filter Dialog */}
       <Dialog open={filterDialogOpen} onOpenChange={setFilterDialogOpen}>
-        <DialogContent className="max-w-md w-[360px] rounded-lg shadow-xl border-none bg-white p-0 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[state=closed]:slide-out-to-top-[2%] data-[state=open]:slide-in-from-top-[2%]">
-          <DialogHeader className="px-6 pt-5 pb-3 flex flex-row items-center justify-between">
-            <DialogTitle className="text-lg font-semibold text-gray-800">Filter by Tags</DialogTitle>
-            <Button variant="ghost" size="icon" onClick={() => setFilterDialogOpen(false)} className="rounded-full h-7 w-7">
-              <X className="h-4 w-4 text-gray-500" />
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-xl font-semibold">Filter by Tags</DialogTitle>
+            <Button
+              variant="outline"
+              className="absolute top-3 right-3 h-7 w-7 p-0 hover:bg-gray-100"
+              onClick={() => setFilterDialogOpen(false)}
+            >
+              <X className="h-4 w-4" />
             </Button>
           </DialogHeader>
           <div className="px-6 pb-4">

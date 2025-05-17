@@ -21,13 +21,32 @@ export type ClientInput = Omit<Client, 'id' | 'created_at' | 'updated_at'>;
  */
 export async function createClient(clientData: ClientInput): Promise<DbResponse<Client>> {
   try {
+    // First check to make sure we're authenticated
+    const { data: userData, error: authError } = await supabase.auth.getUser();
+    if (authError || !userData.user) {
+      throw new Error('Authentication required');
+    }
+
+    // Make sure therapist_id is set to the current user's ID if not provided
+    const dataToInsert = {
+      ...clientData,
+      // If therapist_id is not provided, use the current user's ID
+      therapist_id: clientData.therapist_id || userData.user.id,
+    };
+
+    console.log('Creating client with data:', dataToInsert);
+
+    // Perform the insert
     const { data, error } = await supabase
       .from('clients')
-      .insert(clientData)
+      .insert(dataToInsert)
       .select()
       .single();
 
-    if (error) throw error;
+    if (error) {
+      console.error('Insert error details:', error);
+      throw error;
+    }
     
     return { data, error: null };
   } catch (error) {

@@ -6,14 +6,19 @@ import { format } from "date-fns";
 import NoteDetailsModal from "@/components/NoteDetailsModal";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
-import { Tooltip } from "@/components/ui/tooltip";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 function getPreview(text: string, maxLength = 80) {
   if (!text) return "";
   return text.length > maxLength ? text.slice(0, maxLength) + "..." : text;
 }
 
-const NotesGrid = ({ notes }: { notes: ClinicalNote[] }) => {
+interface NotesGridProps {
+  notes: ClinicalNote[];
+  onDeleteNote?: (noteId: string) => void;
+}
+
+const NotesGrid = ({ notes, onDeleteNote }: NotesGridProps) => {
   const [selectedNote, setSelectedNote] = useState<any | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
@@ -39,9 +44,15 @@ const NotesGrid = ({ notes }: { notes: ClinicalNote[] }) => {
 
   const handleConfirmDelete = () => {
     if (noteToDelete) {
-      const idx = notes.findIndex((n) => n.id === noteToDelete.id);
-      if (idx !== -1) {
-        notes.splice(idx, 1);
+      // If external delete handler is provided, use it
+      if (onDeleteNote) {
+        onDeleteNote(noteToDelete.id);
+      } else {
+        // Local state modification (fallback)
+        const idx = notes.findIndex((n) => n.id === noteToDelete.id);
+        if (idx !== -1) {
+          notes.splice(idx, 1);
+        }
       }
     }
     setDeleteDialogOpen(false);
@@ -128,28 +139,41 @@ const NotesGrid = ({ notes }: { notes: ClinicalNote[] }) => {
               </div>
               <div className="flex flex-col items-end gap-1 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity duration-200 mt-0.5">
                 <div className="flex gap-1">
-                  <Tooltip content="Edit">
-                    <button
-                      className="p-1 rounded hover:bg-therapy-blue/20 text-therapy-purple hover:text-therapy-blue transition-colors focus:outline-none focus:ring-2 focus:ring-therapy-purple"
-                      aria-label="Edit note"
-                      type="button"
-                      onClick={(e) => { e.stopPropagation(); handleEditClick(note); }}
-                      tabIndex={0}
-                    >
-                      <Pencil className="w-4 h-4" />
-                    </button>
-                  </Tooltip>
-                  <Tooltip content="Delete">
-                    <button
-                      className="p-1 rounded hover:bg-red-100 text-red-400 hover:text-red-600 transition-colors focus:outline-none focus:ring-2 focus:ring-red-400"
-                      aria-label="Delete note"
-                      type="button"
-                      onClick={(e) => { e.stopPropagation(); handleDeleteClick(note); }}
-                      tabIndex={0}
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
-                  </Tooltip>
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <button
+                          className="p-1 rounded hover:bg-therapy-blue/20 text-therapy-purple hover:text-therapy-blue transition-colors focus:outline-none focus:ring-2 focus:ring-therapy-purple"
+                          aria-label="Edit note"
+                          type="button"
+                          onClick={(e) => { e.stopPropagation(); handleEditClick(note); }}
+                        >
+                          <Pencil className="w-4 h-4" />
+                        </button>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p>Edit Note</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                  
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <button
+                          className="p-1 rounded hover:bg-red-100 text-red-400 hover:text-red-600 transition-colors focus:outline-none focus:ring-2 focus:ring-red-400"
+                          aria-label="Delete note"
+                          type="button"
+                          onClick={(e) => { e.stopPropagation(); handleDeleteClick(note); }}
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p>Delete Note</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
                 </div>
               </div>
             </CardHeader>

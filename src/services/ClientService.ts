@@ -33,11 +33,183 @@ export interface ClientProfile extends DbClientProfile {
 // Use this for creating new client profiles
 export type ClientProfileInput = DbClientProfileInput;
 
-export interface ClientWithProfile extends Client {
+// Define ClientWithProfile as its own interface that includes all fields we need
+export interface ClientWithProfile {
+  id: string;
+  first_name: string;
+  last_name: string;
+  email?: string;
+  phone?: string;
+  status?: string;
+  therapist_id: string;
+  created_at?: string;
+  updated_at?: string;
+  // UI-specific fields
+  name?: string;
+  session_count?: number;
+  last_session_date?: string;
+  // Profile data
   profile?: ClientProfile;
 }
 
 export class ClientService {
+  /**
+   * Create a new client with profile
+   */
+  async createClientWithProfile(client: Partial<Client>, profile?: Partial<ClientProfile>) {
+    try {
+      // Prepare client data for insertion
+      const clientInput: Partial<DbClientInput> = {
+        first_name: client.first_name || '',
+        last_name: client.last_name || '',
+        email: client.email,
+        phone: client.phone,
+        status: client.status as any || 'active',
+        therapist_id: client.therapist_id
+      };
+
+      // Create the client record
+      const { data: createdClient, error: clientError } = await clientOperations.createClient(clientInput as DbClientInput);
+
+      if (clientError) throw clientError;
+      if (!createdClient) throw new Error('Failed to create client');
+
+      // Create profile if provided
+      if (profile && createdClient) {
+        try {
+          // Prepare profile data for insertion
+          const profileInput: Partial<DbClientProfileInput> = {
+            client_id: createdClient.id,
+            date_of_birth: profile.date_of_birth,
+            address: profile.address,
+            emergency_contact: profile.emergency_contact,
+            occupation: profile.occupation,
+            therapy_type: profile.therapy_type,
+            // Add any other fields from the profile
+          };
+
+          // Create the profile record
+          const { data: createdProfile, error: profileError } = 
+            await clientProfileOperations.createClientProfile(profileInput as DbClientProfileInput);
+
+          if (profileError) {
+            console.error('Error creating client profile:', profileError);
+            // Continue even without profile creation
+          }
+
+          // Return the client with nested profile
+          return { 
+            data: { 
+              ...createdClient, 
+              profile: createdProfile || undefined 
+            } as ClientWithProfile, 
+            error: null 
+          } as DbResponse<ClientWithProfile>;
+        } catch (profileError) {
+          console.error('Error creating client profile:', profileError);
+          // Return just the client if profile creation fails
+          return { 
+            data: createdClient as ClientWithProfile, 
+            error: null 
+          } as DbResponse<ClientWithProfile>;
+        }
+      }
+
+      // Return just the client if no profile was provided
+      return { 
+        data: createdClient as ClientWithProfile, 
+        error: null 
+      } as DbResponse<ClientWithProfile>;
+    } catch (error) {
+      console.error('Error creating client with profile:', error);
+      return { data: null, error: error as Error };
+    }
+  }
+
+  /**
+   * Update a client with profile
+   */
+  async updateClientWithProfile(clientId: string, client: Partial<Client>, profile?: Partial<ClientProfile>) {
+    try {
+      // First get the current client data
+      const { data: currentClient, error: getError } = await clientOperations.getClientById(clientId);
+      
+      if (getError) throw getError;
+      if (!currentClient) throw new Error('Client not found');
+      
+      // Create a valid update object for the client
+      const clientUpdate: Partial<DbClientInput> = {};
+      if (client.first_name !== undefined) clientUpdate.first_name = client.first_name;
+      if (client.last_name !== undefined) clientUpdate.last_name = client.last_name;
+      if (client.email !== undefined) clientUpdate.email = client.email;
+      if (client.phone !== undefined) clientUpdate.phone = client.phone;
+      if (client.status !== undefined) clientUpdate.status = client.status as any;
+      
+      // Update client data
+      const { data: updatedClient, error: clientError } = await clientOperations.updateClient(clientId, clientUpdate);
+
+      if (clientError) throw clientError;
+
+      // Update profile if provided
+      let updatedProfile = null;
+      if (profile) {
+        try {
+          // First get the profile ID
+          const { data: profileData } = await clientProfileOperations.getClientProfileByClientId(clientId);
+          
+          if (profileData) {
+            // Create a valid profile update object
+            const profileUpdate: any = {};
+            if (profile.date_of_birth) profileUpdate.date_of_birth = profile.date_of_birth;
+            if (profile.address) profileUpdate.address = profile.address;
+            if (profile.emergency_contact) profileUpdate.emergency_contact = profile.emergency_contact;
+            if (profile.occupation) profileUpdate.occupation = profile.occupation;
+            if (profile.therapy_type) profileUpdate.therapy_type = profile.therapy_type;
+            
+            // Update the profile
+            const { data } = await clientProfileOperations.updateClientProfile(profileData.id, profileUpdate);
+            updatedProfile = data;
+          } else {
+            // Create new profile if it doesn't exist
+            const profileInput = {
+              client_id: clientId,
+              date_of_birth: profile.date_of_birth,
+              address: profile.address,
+              emergency_contact: profile.emergency_contact,
+              occupation: profile.occupation,
+              therapy_type: profile.therapy_type
+              // Add other relevant profile fields here
+            };
+            const { data } = await clientProfileOperations.createClientProfile(profileInput as any);
+            updatedProfile = data;
+          }
+        } catch (profileError) {
+          console.error('Error updating client profile:', profileError);
+          // Continue even without profile update
+        }
+      }
+
+      return { 
+        data: { 
+          ...updatedClient, 
+          ...client, 
+          profile: updatedProfile || undefined 
+        } as ClientWithProfile, 
+        error: null 
+      } as DbResponse<ClientWithProfile>;
+    } catch (error) {
+      console.error('Error updating client with profile:', error);
+      return { data: null, error: error as Error };
+    }
+  }
+
+  /**
+   * Delete a client
+   */
+  async delete(clientId: string) {
+    return this.deleteClient(clientId);
+  }
+
   /**
    * Get all clients for a therapist
    */

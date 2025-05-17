@@ -221,6 +221,9 @@ export function ProfileMenu() {
         </DropdownMenu>
 
         <DialogContent className="max-w-3xl w-full p-0 overflow-hidden">
+          <DialogHeader className="sr-only">
+            <DialogTitle>Your Profile</DialogTitle>
+          </DialogHeader>
           <div className="flex flex-col md:flex-row w-full h-full">
             {/* Left: Profile summary and picture */}
             <div className="md:w-1/3 bg-gradient-to-b from-therapy-blue/10 to-white flex flex-col items-center justify-center p-8 border-r border-gray-100 relative">

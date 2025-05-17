@@ -6,7 +6,8 @@ import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { User, Eye, Edit, Filter, SortAsc, Plus, Search, Trash2, Loader2 } from "lucide-react";
 import AddClientForm from "@/components/AddClientForm";
-import { Dialog, DialogContent } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
 import { useAuth } from "@/contexts/AuthContext";
 import { ClientService, ClientWithProfile } from "@/services/ClientService";
 import { toast } from "sonner";
@@ -25,42 +26,44 @@ export default function Clients() {
   const [deleteClientId, setDeleteClientId] = useState<string | null>(null);
   const navigate = useNavigate();
 
+  // Function to fetch clients (defined outside useEffect to be accessible throughout component)
+  const fetchClients = async () => {
+    if (!user?.id) return;
+    
+    try {
+      setLoading(true);
+      const { data, error } = await clientService.getClientsWithProfiles(user.id);
+      
+      if (error) {
+        setError(error.message);
+        toast.error("Failed to load clients");
+        return;
+      }
+      
+      if (data) {
+        setClients(data);
+      }
+    } catch (err: any) {
+      setError(err.message);
+      toast.error("An error occurred while loading clients");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   // Fetch clients on component load
   useEffect(() => {
-    const fetchClients = async () => {
-      if (!user?.id) return;
-      
-      try {
-        setLoading(true);
-        const { data, error } = await clientService.getClientsWithProfiles(user.id);
-        
-        if (error) {
-          setError(error.message);
-          toast.error("Failed to load clients");
-          return;
-        }
-        
-        if (data) {
-          setClients(data);
-        }
-      } catch (err: any) {
-        setError(err.message);
-        toast.error("An error occurred while loading clients");
-      } finally {
-        setLoading(false);
-      }
-    };
-
     fetchClients();
   }, [user?.id]);
 
   const handleAddClient = async (data: any) => {
-    if (!user?.id) {
+    if (!user) {
       toast.error("You must be logged in to add clients");
       return;
     }
 
     try {
+      setLoading(true);
       // Split name into first and last name
       const nameParts = data.name.split(' ');
       const firstName = nameParts[0] || '';
@@ -75,6 +78,8 @@ export default function Clients() {
         therapist_id: user.id
       };
 
+      console.log('Creating client with therapist_id:', user.id);
+
       const profileData = {
         date_of_birth: data.dob,
         address: data.address,
@@ -88,15 +93,20 @@ export default function Clients() {
       const { data: newClient, error } = await clientService.createClientWithProfile(clientData, profileData);
       
       if (error) {
-        toast.error("Failed to create client");
+        console.error('Client creation error:', error);
+        toast.error(`Failed to create client: ${error.message}`);
+        setLoading(false);
         return;
       }
 
       if (newClient) {
         toast.success("Client added successfully");
-        // Update local state with the new client
-        setClients([newClient, ...clients]);
         setShowAddDialog(false);
+        
+        // Refresh the client list to ensure we have the latest data
+        if (user?.id) {
+          fetchClients();
+        }
       }
     } catch (err: any) {
       toast.error(err.message || "Failed to add client");
@@ -118,7 +128,7 @@ export default function Clients() {
         last_name: lastName,
         email: data.email,
         phone: data.phone,
-        status: data.status as 'Active' | 'On Hold' | 'Completed' | 'New' || editClient.status,
+        status: (data.status || editClient.status) as 'Active' | 'On Hold' | 'Completed' | 'New',
         updated_at: new Date().toISOString(),
       };
 
@@ -137,8 +147,7 @@ export default function Clients() {
       const { data: updatedClient, error } = await clientService.updateClientWithProfile(
         editClient.id, 
         clientData, 
-        profileData,
-        editClient.profile?.id
+        profileData
       );
       
       if (error) {
@@ -211,12 +220,18 @@ export default function Clients() {
 
       <Dialog open={showAddDialog} onOpenChange={setShowAddDialog}>
         <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Add New Client</DialogTitle>
+          </DialogHeader>
           <AddClientForm onSubmit={handleAddClient} onCancel={() => setShowAddDialog(false)} />
         </DialogContent>
       </Dialog>
       
       <Dialog open={showEditDialog} onOpenChange={v => { setShowEditDialog(v); if (!v) setEditClient(null); }}>
         <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Edit Client</DialogTitle>
+          </DialogHeader>
           <AddClientForm
             onSubmit={handleEditClient}
             onCancel={() => { setShowEditDialog(false); setEditClient(null); }}
