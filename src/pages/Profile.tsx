@@ -1,18 +1,18 @@
 import { useState, useEffect } from "react";
-import { useAuth } from "hooks/useAuth";
+import { useAuth } from "@/contexts/AuthContext";
 import {
   Card,
   CardContent,
   CardDescription,
   CardHeader,
   CardTitle,
-} from "components/ui/card";
-import { Button } from "components/ui/button";
-import { Input } from "components/ui/input";
-import { Label } from "components/ui/label";
-import { Separator } from "components/ui/separator";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "components/ui/tabs";
-import { toast } from "hooks/use-toast";
+} from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Separator } from "@/components/ui/separator";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { toast } from "sonner";
 import {
   UserCircle,
   Building2,
@@ -81,9 +81,8 @@ const Profile = () => {
   const handleSave = () => {
     // Here you would update the profile in your backend
     setIsEditing(false);
-    toast({
-      title: "Profile Updated",
-      description: "Your profile has been successfully updated.",
+    toast.success("Profile Updated", {
+      description: "Your profile has been successfully updated."
     });
   };
 

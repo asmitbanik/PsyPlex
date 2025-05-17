@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { Users, CalendarCheck, BrainCircuit, LineChart, FileText, Plus, Eye, Play, RefreshCw, Loader2 } from "lucide-react";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -26,6 +26,7 @@ interface DashboardSession {
 }
 
 const Dashboard = () => {
+  const navigate = useNavigate();
   const { user } = useAuth();
   const clientService = new ClientService();
   const sessionService = new SessionService();
@@ -59,11 +60,9 @@ const Dashboard = () => {
         // Get recent clients
         const recentClientData = clientsData?.slice(0, 4).map(client => ({
           id: client.id,
-          name: client.name || `${client.first_name} ${client.last_name}`,
+          name: (client.profile ? `${client.profile.first_name || ''} ${client.profile.last_name || ''}` : `${client.first_name || ''} ${client.last_name || ''}`).trim() || 'Client',
           progress: Math.floor(Math.random() * 100), // Replace with actual progress calculation
-          lastSession: client.last_session_date 
-            ? new Date(client.last_session_date).toLocaleDateString() 
-            : 'No sessions yet'
+          lastSession: new Date(client.updated_at || client.created_at || Date.now()).toLocaleDateString()
         })) || [];
         
         setRecentClients(recentClientData);
@@ -219,16 +218,25 @@ const Dashboard = () => {
                   </div>
                   <Progress value={client.progress} className="h-2 bg-gray-200" indicatorClassName="bg-therapy-green" />
                 </div>
-                <Button variant="outline" size="sm" asChild className="rounded-full flex items-center gap-2 font-semibold">
-                  <Link to={`/therapist/clients/${client.id}`}><Eye className="h-4 w-4" /> View</Link>
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  onClick={() => navigate(`/therapist/clients/${client.id}`)}
+                  className="rounded-full flex items-center gap-2 font-semibold cursor-pointer"
+                >
+                  <Eye className="h-4 w-4" /> View
                 </Button>
               </div>
             ))}
           </div>
         </CardContent>
         <CardFooter className="border-t p-4">
-          <Button variant="outline" asChild className="w-full rounded-full flex items-center gap-2 font-semibold">
-            <Link to="/therapist/clients"><Eye className="h-4 w-4" /> View All Clients</Link>
+          <Button 
+            variant="outline" 
+            onClick={() => navigate('/therapist/clients')} 
+            className="w-full rounded-full flex items-center gap-2 font-semibold cursor-pointer"
+          >
+            <Eye className="h-4 w-4" /> View All Clients
           </Button>
         </CardFooter>
       </Card>
@@ -245,20 +253,30 @@ const Dashboard = () => {
               <div key={session.id} className="flex items-center justify-between p-4 rounded-xl border bg-gray-50 shadow-sm">
                 <div className="flex items-center gap-4">
                   <div className="w-12 h-12 rounded-full bg-therapy-blue/10 text-therapy-blue text-xl font-bold flex items-center justify-center">
-                    {session.clientName.split(' ').map(n => n[0]).join('')}
+                    {session.clientName.split(' ').map(n => n[0] || '').join('')}
                   </div>
-                  <div>
-                    <h4 className="font-semibold text-therapy-blue text-lg">{session.clientName}</h4>
-                    <p className="text-sm text-gray-500">
-                      {session.date} at {session.time} • {session.type}
-                    </p>
+                  <div className="flex flex-col gap-1.5">
+                    <p className="font-semibold text-gray-900">{session.clientName}</p>
+                    <div className="flex items-center gap-1 text-xs text-gray-500">
+                      <CalendarCheck className="h-3 w-3" />
+                      <span>{session.date} at {session.time} • {session.type}</span>
+                    </div>
                   </div>
                 </div>
                 <div className="flex space-x-2">
-                  <Button variant="outline" size="sm" className="rounded-full flex items-center gap-2 font-semibold">
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    onClick={() => navigate(`/therapist/sessions?edit=${session.id}`)} 
+                    className="rounded-full flex items-center gap-2 font-semibold cursor-pointer"
+                  >
                     <RefreshCw className="h-4 w-4" /> Reschedule
                   </Button>
-                  <Button size="sm" className="bg-therapy-purple hover:bg-therapy-purpleDeep rounded-full flex items-center gap-2 font-semibold text-white">
+                  <Button 
+                    size="sm" 
+                    onClick={() => navigate(`/therapist/sessions?start=${session.id}`)} 
+                    className="bg-therapy-purple hover:bg-therapy-purpleDeep rounded-full flex items-center gap-2 font-semibold text-white cursor-pointer"
+                  >
                     <Play className="h-4 w-4" /> Start
                   </Button>
                 </div>
@@ -267,8 +285,12 @@ const Dashboard = () => {
           </div>
         </CardContent>
         <CardFooter className="border-t p-4">
-          <Button variant="outline" asChild className="w-full rounded-full flex items-center gap-2 font-semibold">
-            <Link to="/therapist/sessions"><Eye className="h-4 w-4" /> View All Sessions</Link>
+          <Button 
+            variant="outline" 
+            onClick={() => navigate('/therapist/sessions')} 
+            className="w-full rounded-full flex items-center gap-2 font-semibold cursor-pointer"
+          >
+            <Eye className="h-4 w-4" /> View All Sessions
           </Button>
         </CardFooter>
       </Card>

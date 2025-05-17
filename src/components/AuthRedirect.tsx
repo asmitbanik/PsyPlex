@@ -1,47 +1,53 @@
-import { useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useEffect, useState } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { supabase } from '@/lib/supabase';
 import { toast } from 'sonner';
+import { useAuth } from '@/contexts/AuthContext';
 
 // This component handles auth redirects to ensure users are sent to the dashboard
 // after successful authentication (especially with OAuth)
 const AuthRedirect = () => {
   const navigate = useNavigate();
+  const location = useLocation();
+  const { user, loading } = useAuth();
+  const [hasShownWelcome, setHasShownWelcome] = useState(false);
 
   useEffect(() => {
-    // Check if there are auth params in the URL (from OAuth redirect)
-    const checkForAuthRedirect = async () => {
-      try {
-        // Get current session
-        const { data: { session } } = await supabase.auth.getSession();
-        
-        if (session) {
-          console.log('User is authenticated, redirecting to dashboard');
-          toast.success('Successfully signed in');
-          navigate('/therapist');
-        }
-      } catch (error) {
-        console.error('Error checking auth state:', error);
+    // Don't do anything while auth is still loading
+    if (loading) return;
+    
+    // If we're on the auth callback page, let that component handle the redirect
+    if (location.pathname === '/auth/callback') return;
+
+    // Only show welcome message once per session
+    const showWelcomeMessage = () => {
+      if (!hasShownWelcome) {
+        toast.success('Welcome to PsyPlex', {
+          description: 'You have successfully signed in'
+        });
+        setHasShownWelcome(true);
       }
     };
 
-    checkForAuthRedirect();
-
-    // Also set up a listener for future auth changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      console.log('Auth state changed:', event);
-      
-      if (event === 'SIGNED_IN' && session) {
-        console.log('User signed in, redirecting to dashboard');
-        toast.success('Successfully signed in');
-        navigate('/therapist');
-      }
-    });
-
-    return () => {
-      subscription.unsubscribe();
-    };
-  }, [navigate]);
+    // If user is logged in and not on a therapist page, redirect to dashboard
+    if (user && !location.pathname.startsWith('/therapist')) {
+      console.log('User is authenticated, redirecting to dashboard');
+      showWelcomeMessage();
+      navigate('/therapist');
+    } 
+    // If user is not logged in but trying to access protected pages, redirect to login
+    else if (!user && location.pathname.startsWith('/therapist')) {
+      console.log('User is not authenticated, redirecting to login');
+      navigate('/login');
+      toast.error('Authentication required', {
+        description: 'Please sign in to access this page'
+      });
+    }
+    // If user is logged in and on a therapist page, just show welcome message
+    else if (user && location.pathname.startsWith('/therapist') && !hasShownWelcome) {
+      showWelcomeMessage();
+    }
+  }, [user, loading, navigate, location.pathname, hasShownWelcome]);
 
   // This component doesn't render anything visible
   return null;

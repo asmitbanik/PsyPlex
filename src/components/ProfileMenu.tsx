@@ -18,7 +18,7 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
-import { useAuth } from "@/hooks/useAuth";
+import { useAuth } from "@/contexts/AuthContext";
 import { useState, useRef } from "react";
 import { toast } from "@/hooks/use-toast";
 import {
@@ -67,17 +67,59 @@ const profileSchema = z.object({
 type ProfileData = z.infer<typeof profileSchema>;
 
 export function ProfileMenu() {
-  const { logout } = useAuth();
+  const { signOut, user } = useAuth();
+  const [isSigningOut, setIsSigningOut] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  
+  // Handle logout functionality
+  const handleLogout = async () => {
+    try {
+      setIsSigningOut(true);
+      await signOut();
+      // The auth context will handle redirecting the user to login page
+    } catch (error) {
+      console.error('Error during logout:', error);
+    } finally {
+      setIsSigningOut(false);
+    }
+  };
   
   const form = useForm<ProfileData>({
     resolver: zodResolver(profileSchema),
-    defaultValues: profileService.getProfile() || profileService.getInitialProfile(),
+    defaultValues: (() => {
+      // Handle the profileData to ensure all required fields are present
+      const savedProfile = profileService.getProfile();
+      const defaultProfile = profileService.getInitialProfile();
+      
+      if (!savedProfile) return defaultProfile;
+      
+      // Ensure all required fields are present by merging with default profile
+      return {
+        profilePicture: savedProfile.profilePicture || defaultProfile.profilePicture,
+        fullName: savedProfile.fullName || defaultProfile.fullName,
+        email: savedProfile.email || defaultProfile.email,
+        phone: savedProfile.phone || defaultProfile.phone,
+        specialization: savedProfile.specialization || defaultProfile.specialization,
+        languages: savedProfile.languages || defaultProfile.languages,
+        bio: savedProfile.bio || defaultProfile.bio
+      };
+    })()
   });
 
   const handleSave = (data: ProfileData) => {
     try {
-      profileService.updateProfile(data);
+      // Ensure all required fields are present before updating
+      const validProfileData: ProfileData = {
+        profilePicture: data.profilePicture,
+        fullName: data.fullName || 'Anonymous User',
+        email: data.email || 'anonymous@example.com',
+        phone: data.phone || '0000000000',
+        specialization: data.specialization || 'General',
+        languages: data.languages || 'English',
+        bio: data.bio
+      };
+      
+      profileService.updateProfile(validProfileData);
       toast({
         title: "Profile Updated",
         description: "Your profile has been successfully updated.",
@@ -167,11 +209,12 @@ export function ProfileMenu() {
                 </DropdownMenuItem>
               </DialogTrigger>
               <DropdownMenuItem 
-                onClick={() => logout()} 
+                onClick={handleLogout}
+                disabled={isSigningOut} 
                 className="p-2 cursor-pointer rounded-lg hover:bg-red-50 hover:text-red-600 transition-colors"
               >
                 <LogOut className="mr-2 h-4 w-4" />
-                <span>Log out</span>
+                <span>{isSigningOut ? "Signing out..." : "Log out"}</span>
               </DropdownMenuItem>
             </DropdownMenuGroup>
           </DropdownMenuContent>

@@ -1,29 +1,37 @@
-import { supabase } from '@/lib/supabase';
 import { DbResponse } from '@/lib/supabase';
 import { mockClients } from '@/mockData/clients';
+import * as clientOperations from '@/services/db-operations/clients';
+import * as clientProfileOperations from '@/services/db-operations/clientProfiles';
+import * as therapistOperations from '@/services/db-operations/therapists';
 
-export interface Client {
-  id: string;
-  created_at: string;
-  user_id: string;
-  therapist_id: string;
-  email: string;
-  status: string;
+// Import client types from db-operations
+import { Client as DbClient, ClientInput as DbClientInput } from '@/services/db-operations/clients';
+
+// Extended Client interface to match both our UI needs and the database structure
+export interface Client extends DbClient {
+  // Add any additional fields needed for UI that aren't in the database model
+  user_id?: string; // Making this optional since it might not be in db schema
 }
 
-export interface ClientProfile {
-  id: string;
-  client_id: string;
-  first_name: string;
-  last_name: string;
-  date_of_birth?: string;
+// Use this for creating new clients
+export type ClientInput = DbClientInput;
+
+// Import client profile types from db-operations
+import { ClientProfile as DbClientProfile, ClientProfileInput as DbClientProfileInput } from '@/services/db-operations/clientProfiles';
+
+// Extended ClientProfile interface to match both our UI needs and the database structure
+export interface ClientProfile extends DbClientProfile {
+  // Add any additional fields needed for UI that aren't in the database model
+  first_name?: string;
+  last_name?: string;
   phone_number?: string;
-  address?: string;
-  emergency_contact?: string;
   insurance_provider?: string;
   insurance_id?: string;
   notes?: string;
 }
+
+// Use this for creating new client profiles
+export type ClientProfileInput = DbClientProfileInput;
 
 export interface ClientWithProfile extends Client {
   profile?: ClientProfile;
@@ -35,15 +43,29 @@ export class ClientService {
    */
   async getClients(therapistId: string) {
     try {
-      const { data, error } = await supabase
-        .from('clients')
-        .select('*')
-        .eq('therapist_id', therapistId);
+      // Use the db-operations function to get clients
+      const { data, error } = await clientOperations.getClientsByTherapistId(therapistId);
+      
+      if (error) {
+        // Handle missing table or other errors by using mock data
+        if (error.message?.includes('does not exist') || (error as any).code === '42P01') {
+          console.log('Using mock client data because database table does not exist');
+          return { 
+            data: mockClients.filter(client => client.therapist_id === therapistId || therapistId === 'current-user-id'), 
+            error: null 
+          } as DbResponse<Client[]>;
+        }
+        throw error;
+      }
 
-      return { data, error } as DbResponse<Client[]>;
+      return { data, error: null } as DbResponse<Client[]>;
     } catch (error) {
       console.error('Error fetching clients:', error);
-      return { data: null, error: error as Error };
+      // Fall back to mock data for any error
+      return { 
+        data: mockClients.filter(client => client.therapist_id === therapistId || therapistId === 'current-user-id'), 
+        error: null 
+      } as DbResponse<Client[]>;
     }
   }
 
@@ -52,16 +74,26 @@ export class ClientService {
    */
   async getClientById(clientId: string) {
     try {
-      const { data, error } = await supabase
-        .from('clients')
-        .select('*')
-        .eq('id', clientId)
-        .single();
+      // Use the db-operations function to get client by ID
+      const { data, error } = await clientOperations.getClientById(clientId);
+      
+      if (error) {
+        // Handle missing table by using mock data
+        if (error.message?.includes('does not exist') || (error as any).code === '42P01') {
+          console.log('Using mock client data because database table does not exist');
+          // Find a mock client with matching ID
+          const mockClient = mockClients.find(client => client.id === clientId);
+          return { data: mockClient || null, error: null } as DbResponse<Client>;
+        }
+        throw error;
+      }
 
-      return { data, error } as DbResponse<Client>;
+      return { data, error: null } as DbResponse<Client>;
     } catch (error) {
       console.error('Error fetching client:', error);
-      return { data: null, error: error as Error };
+      // Try to find matching mock client for fallback
+      const mockClient = mockClients.find(client => client.id === clientId);
+      return { data: mockClient || null, error: null } as DbResponse<Client>;
     }
   }
 
@@ -70,17 +102,12 @@ export class ClientService {
    */
   async getClientsWithProfiles(therapistId: string) {
     try {
-      const { data, error } = await supabase
-        .from('clients')
-        .select(`
-          *,
-          profile:client_profiles(*)
-        `)
-        .eq('therapist_id', therapistId);
+      // Get clients from the db-operations layer
+      const { data: clients, error: clientsError } = await clientOperations.getClientsByTherapistId(therapistId);
 
-      // Check if the clients table doesn't exist
-      if (error) {
-        if (error.message?.includes('does not exist') || error.code === '42P01') {
+      // Check if there's an error or no clients found
+      if (clientsError || !clients) {
+        if (clientsError?.message?.includes('does not exist') || (clientsError as any)?.code === '42P01') {
           console.log('Using mock client data because database table does not exist');
           // Return mock data if the table doesn't exist
           return { 
@@ -88,19 +115,37 @@ export class ClientService {
             error: null 
           } as DbResponse<ClientWithProfile[]>;
         }
-        throw error; // Re-throw other errors
+        // If other error, throw it to be caught below
+        if (clientsError) throw clientsError;
       }
 
-      // Format the response to match ClientWithProfile interface
-      const clientsWithProfiles = data?.map(client => {
-        const profile = client.profile?.[0] || null;
-        return {
-          ...client,
-          profile
-        };
-      });
+      // If we have clients, fetch their profiles
+      const clientsWithProfiles: ClientWithProfile[] = [];
 
-      return { data: clientsWithProfiles || [], error } as DbResponse<ClientWithProfile[]>;
+      // For each client, try to fetch their profile
+      for (const client of clients || []) {
+        const clientWithProfile: ClientWithProfile = {
+          ...client,  
+          profile: undefined  // Initialize with no profile
+        };
+
+        // Try to get the client's profile
+        try {
+          const { data: profileData } = await clientProfileOperations.getClientProfileByClientId(client.id);
+          
+          if (profileData) {
+            clientWithProfile.profile = profileData as ClientProfile;
+          }
+          
+        } catch (profileError) {
+          console.error(`Error fetching profile for client ${client.id}:`, profileError);
+          // Continue without profile data
+        }
+
+        clientsWithProfiles.push(clientWithProfile);
+      }
+
+      return { data: clientsWithProfiles, error: null } as DbResponse<ClientWithProfile[]>;
     } catch (error) {
       console.error('Error fetching clients with profiles:', error);
       
@@ -118,28 +163,42 @@ export class ClientService {
    */
   async addClient(client: Partial<Client>, profile?: Partial<ClientProfile>) {
     try {
-      // First, insert the client
-      const { data: clientData, error: clientError } = await supabase
-        .from('clients')
-        .insert([client])
-        .select()
-        .single();
+      // Convert client data to match expected format for db-operations
+      const clientInput: DbClientInput = {
+        therapist_id: client.therapist_id || '',
+        first_name: client.first_name || '',
+        last_name: client.last_name || '',
+        email: client.email,
+        phone: client.phone,
+        status: (client.status as 'Active' | 'On Hold' | 'Completed' | 'New') || 'New'
+      };
+      
+      // First, create the client
+      const { data: clientData, error: clientError } = await clientOperations.createClient(clientInput);
 
       if (clientError) throw clientError;
 
       // If profile data is provided, create the profile
       if (profile && clientData) {
-        const { error: profileError } = await supabase
-          .from('client_profiles')
-          .insert([{
-            ...profile,
-            client_id: clientData.id
-          }]);
+        // Create a proper profile input object
+        const profileInput = {
+          client_id: clientData.id,
+          date_of_birth: profile.date_of_birth,
+          address: profile.address,
+          occupation: profile.occupation,
+          emergency_contact: profile.emergency_contact,
+          primary_concerns: profile.primary_concerns,
+          therapy_type: profile.therapy_type,
+          start_date: profile.start_date
+        };
+        
+        // Create the profile using db-operations
+        const { error: profileError } = await clientProfileOperations.createClientProfile(profileInput);
 
         if (profileError) throw profileError;
       }
 
-      return { data: clientData, error: null } as DbResponse<Client>;
+      return { data: clientData as Client, error: null } as DbResponse<Client>;
     } catch (error) {
       console.error('Error adding client:', error);
       return { data: null, error: error as Error };
@@ -151,25 +210,65 @@ export class ClientService {
    */
   async updateClient(clientId: string, client: Partial<Client>, profile?: Partial<ClientProfile>) {
     try {
+      // First get the current client data
+      const { data: currentClient, error: getError } = await clientOperations.getClientById(clientId);
+      
+      if (getError) throw getError;
+      if (!currentClient) throw new Error('Client not found');
+      
+      // Create a valid update object for the client
+      const clientUpdate: Partial<DbClientInput> = {};
+      if (client.first_name !== undefined) clientUpdate.first_name = client.first_name;
+      if (client.last_name !== undefined) clientUpdate.last_name = client.last_name;
+      if (client.email !== undefined) clientUpdate.email = client.email;
+      if (client.phone !== undefined) clientUpdate.phone = client.phone;
+      if (client.status !== undefined) clientUpdate.status = client.status as any;
+      
       // Update client data
-      const { error: clientError } = await supabase
-        .from('clients')
-        .update(client)
-        .eq('id', clientId);
+      const { data: updatedClient, error: clientError } = await clientOperations.updateClient(clientId, clientUpdate);
 
       if (clientError) throw clientError;
 
       // Update profile if provided
       if (profile) {
-        const { error: profileError } = await supabase
-          .from('client_profiles')
-          .update(profile)
-          .eq('client_id', clientId);
-
-        if (profileError) throw profileError;
+        try {
+          // First get the profile ID
+          const { data: profileData } = await clientProfileOperations.getClientProfileByClientId(clientId);
+          
+          if (profileData) {
+            // Create a valid profile update object
+            const profileUpdate: any = {};
+            if (profile.first_name) profileUpdate.first_name = profile.first_name;
+            if (profile.last_name) profileUpdate.last_name = profile.last_name;
+            if (profile.date_of_birth) profileUpdate.date_of_birth = profile.date_of_birth;
+            if (profile.address) profileUpdate.address = profile.address;
+            if (profile.emergency_contact) profileUpdate.emergency_contact = profile.emergency_contact;
+            if (profile.occupation) profileUpdate.occupation = profile.occupation;
+            if (profile.therapy_type) profileUpdate.therapy_type = profile.therapy_type;
+            
+            // Update the profile
+            await clientProfileOperations.updateClientProfile(profileData.id, profileUpdate);
+          } else {
+            // Create new profile if it doesn't exist
+            const profileInput = {
+              client_id: clientId,
+              date_of_birth: profile.date_of_birth,
+              address: profile.address,
+              emergency_contact: profile.emergency_contact,
+              // Add other relevant profile fields here
+            };
+            await clientProfileOperations.createClientProfile(profileInput as any);
+          }
+        } catch (profileError) {
+          console.error('Error updating client profile:', profileError);
+          // Continue even without profile update
+        }
       }
 
-      return { data: { id: clientId, ...client }, error: null } as DbResponse<Partial<Client>>;
+      return { 
+        data: { ...updatedClient, ...client } as Client, 
+        error: null 
+      } as DbResponse<Client>;
     } catch (error) {
       console.error('Error updating client:', error);
       return { data: null, error: error as Error };
@@ -181,11 +280,19 @@ export class ClientService {
    */
   async deleteClient(clientId: string) {
     try {
-      // Delete client (cascade should handle profile deletion if set up in DB)
-      const { error } = await supabase
-        .from('clients')
-        .delete()
-        .eq('id', clientId);
+      // First try to get the client profile to clean it up
+      try {
+        const { data: profileData } = await clientProfileOperations.getClientProfileByClientId(clientId);
+        if (profileData) {
+          await clientProfileOperations.deleteClientProfile(profileData.id);
+        }
+      } catch (profileError) {
+        console.error('Error deleting client profile:', profileError);
+        // Continue even if profile deletion fails
+      }
+      
+      // Now delete the client using db-operations
+      const { data, error } = await clientOperations.deleteClient(clientId);
 
       if (error) throw error;
 

@@ -1,6 +1,9 @@
-import { Link, useLocation } from "react-router-dom";
-import { CalendarCheck, Users, FileText, BrainCircuit, LineChart, Home, UserCircle } from "lucide-react";
+import { useState } from "react";
+import { Link, useLocation, useNavigate } from "react-router-dom";
+import { CalendarCheck, Users, FileText, BrainCircuit, LineChart, Home, UserCircle, LogOut, Settings } from "lucide-react";
 import { ProfileMenu } from "./ProfileMenu";
+import { useAuth } from "@/contexts/AuthContext";
+import { toast } from "sonner";
 
 interface SidebarProps {
   isOpen: boolean;
@@ -9,13 +12,32 @@ interface SidebarProps {
 
 const Sidebar = ({ isOpen, setIsOpen }: SidebarProps) => {
   const location = useLocation();
-    const navItems = [
-    { name: "Dashboard", path: "/therapist", icon: <Home className="w-5 h-5" /> },
+  const navigate = useNavigate();
+  const { signOut, user } = useAuth();
+  const [isSigningOut, setIsSigningOut] = useState(false);
+  
+  // Handle logout functionality
+  const handleLogout = async () => {
+    try {
+      setIsSigningOut(true);
+      await signOut();
+      navigate('/login');
+    } catch (error) {
+      console.error('Error during logout:', error);
+      toast.error('Failed to log out');
+    } finally {
+      setIsSigningOut(false);
+    }
+  };
+  
+  const navItems = [
+    { name: "Dashboard", path: "/therapist", icon: <Home className="w-5 h-5" />, exact: true },
     { name: "Clients", path: "/therapist/clients", icon: <Users className="w-5 h-5" /> },
     { name: "Sessions", path: "/therapist/sessions", icon: <CalendarCheck className="w-5 h-5" /> },
     { name: "Therapy Insights", path: "/therapist/insights", icon: <BrainCircuit className="w-5 h-5" /> },
     { name: "Progress Tracker", path: "/therapist/progress", icon: <LineChart className="w-5 h-5" /> },
-    { name: "Notes", path: "/therapist/notes", icon: <FileText className="w-5 h-5" /> }
+    { name: "Notes", path: "/therapist/notes", icon: <FileText className="w-5 h-5" /> },
+    { name: "Profile", path: "/therapist/profile", icon: <Settings className="w-5 h-5" /> }
   ];
 
   return (
@@ -40,8 +62,9 @@ const Sidebar = ({ isOpen, setIsOpen }: SidebarProps) => {
       <nav className="flex-1 overflow-y-auto p-6">
         <ul className="space-y-3">
           {navItems.map((item) => {
-            const isActive = location.pathname === item.path || 
-                             (item.path !== "/therapist" && location.pathname.startsWith(item.path));
+            const isActive = item.exact 
+                           ? location.pathname === item.path 
+                           : location.pathname === item.path || location.pathname.startsWith(item.path);
             return (
               <li key={item.name}>
                 <Link
@@ -60,8 +83,20 @@ const Sidebar = ({ isOpen, setIsOpen }: SidebarProps) => {
             );
           })}
         </ul>
-      </nav>      <div className="p-6 border-t border-gray-200">
+      </nav>      <div className="p-6 border-t border-gray-200 space-y-3">
         <ProfileMenu />
+        
+        {/* Direct logout button for easier accessibility */}
+        <button
+          onClick={handleLogout}
+          disabled={isSigningOut}
+          className="w-full flex items-center gap-4 px-5 py-3 rounded-xl text-lg font-semibold transition-all group relative text-red-600 hover:bg-red-50"
+        >
+          <span className="flex items-center justify-center w-7 h-7 text-red-400 group-hover:text-red-600 transition-colors">
+            <LogOut className="w-5 h-5" />
+          </span>
+          <span>{isSigningOut ? "Signing out..." : "Log out"}</span>
+        </button>
       </div>
     </aside>
   );
