@@ -37,23 +37,42 @@ export async function createClient(clientData: ClientInput): Promise<DbResponse<
     const currentUserId = authData.session.user.id;
     console.log(`Current authenticated user ID: ${currentUserId}`);
     
-    // Use our therapist operations module to get or create a therapist
-    // This will use the service role client internally if needed
-    const { data: therapist, error: therapistError } = await therapistOperations.createTherapist({
-      user_id: currentUserId,
-      full_name: 'New Therapist' // Default name, can be updated later
-    });
+    // First, let's try to find an existing therapist for this user
+    const { data: existingTherapists } = await supabaseAdmin
+      .from('therapists')
+      .select('*')
+      .eq('user_id', currentUserId);
     
-    if (therapistError || !therapist) {
-      console.error('Error getting/creating therapist record:', therapistError);
-      throw new Error('Could not create therapist profile: ' + 
-        (therapistError?.message || 'Unknown error'));
+    let therapistId: string;
+    
+    // If we already have therapist(s) for this user, use the first one
+    if (existingTherapists && existingTherapists.length > 0) {
+      therapistId = existingTherapists[0].id;
+      console.log(`Using existing therapist ID: ${therapistId} for user ID: ${currentUserId}`);
+      
+      // Log if there are multiple therapists (unusual situation)
+      if (existingTherapists.length > 1) {
+        console.warn(`User ${currentUserId} has ${existingTherapists.length} therapist records. Using ID: ${therapistId}`);
+      }
+    } else {
+      // If no therapist exists, create one using therapistOperations
+      const { data: newTherapist, error: therapistError } = await therapistOperations.createTherapist({
+        user_id: currentUserId,
+        full_name: 'New Therapist' // Default name, can be updated later
+      });
+      
+      if (therapistError || !newTherapist) {
+        console.error('Error creating therapist record:', therapistError);
+        throw new Error('Could not create therapist profile: ' + 
+          (therapistError?.message || 'Unknown error'));
+      }
+      
+      therapistId = newTherapist.id;
+      console.log(`Created new therapist with ID: ${therapistId} for user ID: ${currentUserId}`);
     }
     
-    const therapistId = therapist.id;
-    console.log(`Using therapist ID: ${therapistId} for user ID: ${currentUserId}`);
-    
-    // Use the service role client to bypass RLS
+    // Use the therapist ID to create the client
+    console.log(`Creating client with therapist ID: ${therapistId} for user ID: ${currentUserId}`);
     return await createClientWithServiceRole(clientData, therapistId, currentUserId);
     
   } catch (error) {
@@ -142,59 +161,193 @@ export async function getClientById(clientId: string): Promise<DbResponse<Client
 
 /**
  * Retrieves all clients associated with a specific therapist
- * This function uses the admin client to bypass RLS policies
- * @param therapistId UUID of the therapist
+ * This function uses the admin client to bypass RLS policies if needed
+ * @param therapistId UUID of the therapist or user ID
  * @returns Array of client objects or an error
  */
 export async function getClientsByTherapistId(therapistId: string): Promise<DbResponse<Client[]>> {
   try {
-    console.log('Fetching clients for therapist:', therapistId);
+    console.log('Fetching clients for therapist/user ID:', therapistId);
     
-    // First check if the user is authenticated
+    // First ensure we have authentication
     const { data: authData } = await supabase.auth.getSession();
     
     if (!authData?.session?.user?.id) {
       throw new Error('Authentication required to view clients');
     }
     
-    // First try to use the regular client (with RLS)
-    try {
-      const { data, error } = await supabase
-        .from('clients')
-        .select('*')
-        .eq('therapist_id', therapistId);
-
-      // If we get data with the regular client, return it
-      if (!error && data && data.length > 0) {
-        console.log(`Found ${data.length} clients using regular client`);
-        return { data, error: null };
-      }
-    } catch (regularError) {
-      // Regular client failed, we'll try with admin client next
-      console.log('Regular client failed, trying admin client');
-    }
+    const userId = authData.session.user.id;
+    console.log('Current authenticated user ID:', userId);
     
-    // If we reach here, we need to use the admin client to bypass RLS
+    // Ensure we have the admin client available
     if (!supabaseAdmin) {
       throw new Error('Admin client not available - check environment variables');
     }
     
-    // Use the admin client to bypass RLS
+    // First find all therapist records for this user (may have multiple)
+    const { data: therapists, error: therapistError } = await supabaseAdmin
+      .from('therapists')
+      .select('*')
+      .eq('user_id', userId);
+    
+    if (therapistError) {
+      console.error('Error fetching therapist records:', therapistError);
+      // We'll still try to proceed with the provided therapistId
+    }
+    
+    // Get the first therapist record if there are any
+    const therapist = therapists && therapists.length > 0 ? therapists[0] : null;
+    
+    if (therapists && therapists.length > 1) {
+      console.warn(`Found ${therapists.length} therapist records for user ID ${userId}, using the first one: ${therapist?.id}`);
+    }
+    
+    // Use the found therapist ID if available, otherwise use the provided ID
+    const actualTherapistId = therapist?.id || therapistId;
+    console.log(`Using therapist ID: ${actualTherapistId} for query`);
+    
+    // Use the admin client to bypass RLS consistently
     const { data, error } = await supabaseAdmin
       .from('clients')
       .select('*')
-      .eq('therapist_id', therapistId);
+      .eq('therapist_id', actualTherapistId);
 
     if (error) {
-      console.error('Admin client error fetching clients:', error);
+      console.error('Error fetching clients:', error);
       throw error;
     }
     
-    console.log(`Found ${data?.length || 0} clients using admin client`);
-    return { data, error: null };
+    console.log(`Found ${data?.length || 0} clients for therapist ID: ${actualTherapistId}`);
+    
+    // If this therapist ID didn't work and it's different from the provided one,
+    // let's also try with the original therapist ID as a fallback
+    if ((data?.length === 0) && actualTherapistId !== therapistId) {
+      console.log(`No clients found with therapist ID ${actualTherapistId}, trying with original ID ${therapistId}`);
+      
+      const fallbackResult = await supabaseAdmin
+        .from('clients')
+        .select('*')
+        .eq('therapist_id', therapistId);
+      
+      if (!fallbackResult.error && fallbackResult.data?.length > 0) {
+        console.log(`Found ${fallbackResult.data.length} clients using fallback therapist ID`);
+        return { data: fallbackResult.data, error: null };
+      }
+    }
+    
+    // Return the result from the main query
+    return { data: data || [], error: null };
   } catch (error) {
     console.error('Error fetching clients by therapist ID:', error);
-    return { data: null, error: error as Error };
+    return { data: [], error: error as Error };
+  }
+}
+
+/**
+ * Get client with profile data
+ * Used to retrieve a client with their profile data in a single request
+ * @param clientId The ID of the client to retrieve
+ * @returns The client with profile data
+ */
+export type ClientWithProfile = Client & {
+  profile: any | null; // Using any for profile type since it's dynamic
+};
+
+/**
+ * Get all clients with their profiles for a therapist
+ * @param therapistId The ID of the therapist or user ID to get clients for
+ * @returns Array of clients with their profiles
+ */
+export async function getClientsWithProfiles(therapistId: string): Promise<DbResponse<ClientWithProfile[]>> {
+  try {
+    // First check if the user is authenticated
+    const { data: authData } = await supabase.auth.getSession();
+    
+    if (!authData?.session?.user?.id) {
+      throw new Error('Authentication required to view clients with profiles');
+    }
+    
+    console.log('Getting clients with profiles for user/therapist ID:', therapistId);
+    
+    // Ensure admin client is available
+    if (!supabaseAdmin) {
+      throw new Error('Admin client not available');
+    }
+    
+    // First find the therapist record for this user
+    const { data: therapists, error: therapistError } = await supabaseAdmin
+      .from('therapists')
+      .select('id')
+      .eq('user_id', therapistId);
+      
+    if (therapistError) {
+      console.error('Error finding therapist record:', therapistError);
+      throw therapistError;
+    }
+    
+    // If no therapist found, return empty array
+    if (!therapists || therapists.length === 0) {
+      console.warn(`No therapist record found for user ID: ${therapistId}`);
+      return { data: [], error: null };
+    }
+    
+    // Get the therapist ID from the first record
+    const actualTherapistId = therapists[0].id;
+    console.log(`Found therapist ID: ${actualTherapistId} for user ID: ${therapistId}`);
+    
+    // Fetch clients first
+    const { data: clients, error: clientsError } = await supabaseAdmin
+      .from('clients')
+      .select('*')
+      .eq('therapist_id', actualTherapistId);
+    
+    if (clientsError) {
+      console.error('Error fetching clients:', clientsError);
+      throw clientsError;
+    }
+    
+    if (!clients || clients.length === 0) {
+      console.log(`No clients found for therapist ID: ${actualTherapistId}`);
+      return { data: [], error: null };
+    }
+    
+    console.log(`Found ${clients.length} clients, now fetching profiles...`);
+    
+    // For each client, get its profile
+    const clientsWithProfiles: ClientWithProfile[] = [];
+    
+    for (const client of clients) {
+      try {
+        // Get the profile
+        const { data: profiles, error: profileError } = await supabaseAdmin
+          .from('client_profiles')
+          .select('*')
+          .eq('client_id', client.id);
+        
+        if (profileError) {
+          console.error(`Error fetching profile for client ${client.id}:`, profileError);
+        }
+        
+        // Add client with profile (or null profile if none found)
+        clientsWithProfiles.push({
+          ...client,
+          profile: (profiles && profiles.length > 0) ? profiles[0] : null
+        });
+      } catch (profileErr) {
+        console.error(`Error processing profile for client ${client.id}:`, profileErr);
+        // Still add the client, but with null profile
+        clientsWithProfiles.push({
+          ...client,
+          profile: null
+        });
+      }
+    }
+    
+    console.log(`Returning ${clientsWithProfiles.length} clients with profiles`);
+    return { data: clientsWithProfiles, error: null };
+  } catch (error) {
+    console.error('Error fetching clients with profiles:', error);
+    return { data: [], error: error as Error };
   }
 }
 

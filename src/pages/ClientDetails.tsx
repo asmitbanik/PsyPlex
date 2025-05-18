@@ -25,7 +25,7 @@ const ClientDetails = () => {
       
       try {
         setLoading(true);
-        const { data, error } = await clientService.getClientWithProfile(clientId);
+        const { data, error } = await clientService.getClientById(clientId);
         
         if (error) {
           setError(error.message);

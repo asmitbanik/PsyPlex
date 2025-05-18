@@ -55,17 +55,39 @@ export async function createTherapist(therapistData: TherapistInput): Promise<Db
     const userId = userData.user.id;
     console.log('Authenticated user ID:', userId);
 
+    // Ensure we have a supabaseAdmin client to bypass RLS
+    if (!supabaseAdmin) {
+      throw new Error('Service role client not available - check your environment variables');
+    }
+
     // Check if a therapist record already exists for this user
-    // We'll use the regular client first to check
-    const { data: existingTherapist, error: existingError } = await supabase
+    // Always use the admin client to check existing therapists to avoid RLS issues
+    const { data: therapists, error: therapistError } = await supabaseAdmin
       .from('therapists')
-      .select('id')
-      .eq('user_id', userId)
-      .maybeSingle();
-      
+      .select('*')
+      .eq('user_id', userId);
+    
+    if (therapistError) {
+      console.error('Error fetching therapist records:', therapistError);
+      // We'll still try to proceed with the provided therapistId
+    }
+    
+    // Get the first therapist record if there are any
+    const existingTherapist = therapists && therapists.length > 0 ? therapists[0] : null;
+    
+    if (therapists && therapists.length > 1) {
+      console.warn(`Found ${therapists.length} therapist records for user ID ${userId}, using the first one: ${existingTherapist?.id}`);
+    }
+    
     if (existingTherapist) {
       console.log('Therapist record already exists with ID:', existingTherapist.id);
       return { data: existingTherapist as Therapist, error: null };
+    }
+    
+    // Log the error if there was one (but not if it was just "no rows returned")
+    if (therapistError && !therapistError.message.includes('no rows')) {
+      console.warn('Error checking for existing therapist:', therapistError);
+      // Continue anyway to create a new therapist
     }
 
     // No existing therapist, create a new one with service role client

@@ -1,11 +1,10 @@
-import { DbResponse, supabase } from '@/lib/supabase';
-import { mockClients } from '@/mockData/clients';
+import { DbResponse } from '@/lib/supabase';
 import * as clientOperations from '@/services/db-operations/clients';
 import * as clientProfileOperations from '@/services/db-operations/clientProfiles';
-import * as therapistOperations from '@/services/db-operations/therapists';
 
 // Import client types from db-operations
-import { Client as DbClient, ClientInput as DbClientInput } from '@/services/db-operations/clients';
+import { Client as DbClient, ClientInput as DbClientInput, ClientWithProfile as DbClientWithProfile } from '@/services/db-operations/clients';
+import { ClientProfile as DbClientProfile, ClientProfileInput as DbClientProfileInput } from '@/services/db-operations/clientProfiles';
 
 // Extended Client interface to match both our UI needs and the database structure
 export interface Client extends DbClient {
@@ -15,9 +14,6 @@ export interface Client extends DbClient {
 
 // Use this for creating new clients
 export type ClientInput = DbClientInput;
-
-// Import client profile types from db-operations
-import { ClientProfile as DbClientProfile, ClientProfileInput as DbClientProfileInput } from '@/services/db-operations/clientProfiles';
 
 // Extended ClientProfile interface to match both our UI needs and the database structure
 export interface ClientProfile extends DbClientProfile {
@@ -34,255 +30,56 @@ export interface ClientProfile extends DbClientProfile {
 export type ClientProfileInput = DbClientProfileInput;
 
 // Define ClientWithProfile as its own interface that includes all fields we need
-export interface ClientWithProfile {
-  id: string;
-  first_name: string;
-  last_name: string;
-  email?: string;
-  phone?: string;
-  status?: string;
-  therapist_id: string;
-  created_at?: string;
-  updated_at?: string;
+export interface ClientWithProfile extends DbClientWithProfile {
   // UI-specific fields
   name?: string;
   session_count?: number;
   last_session_date?: string;
-  // Profile data
-  profile?: ClientProfile;
 }
 
+/**
+ * Client Service - Provides a layer of abstraction between the UI and the database
+ * Note: Most functionality is now handled directly by the db-operations layer
+ * This service is kept for backward compatibility but we recommend using db-operations directly
+ */
 export class ClientService {
+  
   /**
-   * Create a new client with profile
+   * Get clients with their profile information
    */
-  async createClientWithProfile(client: Partial<Client>, profile?: Partial<ClientProfile>) {
+  async getClientsWithProfiles(therapistId: string): Promise<DbResponse<ClientWithProfile[]>> {
     try {
-      console.log('ClientService.createClientWithProfile called with therapist_id:', client.therapist_id);
+      console.log('ClientService: Fetching clients with profiles for therapist/user ID:', therapistId);
       
-      // Verify we have a therapist_id
-      if (!client.therapist_id) {
-        console.error('No therapist_id provided for client creation');
-        throw new Error('Therapist ID is required to create a client');
-      }
-
-      // Prepare client data for insertion
-      const clientInput: Partial<DbClientInput> = {
-        first_name: client.first_name || '',
-        last_name: client.last_name || '',
-        email: client.email,
-        phone: client.phone,
-        status: client.status as any || 'New',
-        therapist_id: client.therapist_id
-      };
-
-      console.log('Prepared client input:', clientInput);
-
-      // Create the client record - the db-operations layer will handle authentication
-      // and ensure the therapist_id matches the authenticated user
-      const { data: createdClient, error: clientError } = await clientOperations.createClient(clientInput as DbClientInput);
-
-      if (clientError) {
-        console.error('Client creation error:', clientError);
-        throw clientError;
+      // Call the database operation with better error handling
+      const result = await clientOperations.getClientsWithProfiles(therapistId);
+      
+      if (result.error) {
+        console.error('ClientService: Error fetching clients with profiles:', result.error);
+        return { data: [], error: result.error };
+      } 
+      
+      if (!result.data) {
+        console.warn('ClientService: No client data returned from database operation');
+        return { data: [], error: null };
       }
       
-      if (!createdClient) {
-        console.error('No client data returned after creation');
-        throw new Error('Failed to create client - no data returned');
-      }
+      // Process the clients to add UI-specific fields
+      const processedClients = result.data.map(client => ({
+        ...client,
+        name: `${client.first_name} ${client.last_name}`,
+        session_count: 0, // Default values
+        last_session_date: null
+      }));
       
-      console.log('Client created successfully:', createdClient.id);
-
-      // Create profile if provided
-      if (profile && createdClient) {
-        try {
-          // Prepare profile data for insertion
-          const profileInput: Partial<DbClientProfileInput> = {
-            client_id: createdClient.id,
-            date_of_birth: profile.date_of_birth,
-            address: profile.address,
-            emergency_contact: profile.emergency_contact,
-            occupation: profile.occupation,
-            therapy_type: profile.therapy_type,
-            primary_concerns: profile.primary_concerns,
-            start_date: profile.start_date
-          };
-
-          console.log('Prepared profile input:', profileInput);
-
-          // Create the profile record
-          const { error: profileError } = await clientProfileOperations.createClientProfile(profileInput as DbClientProfileInput);
-          
-          if (profileError) {
-            console.error('Profile creation error:', profileError);
-            // Don't fail the entire operation if profile creation fails
-          }
-        } catch (profileError) {
-          console.error('Error creating profile:', profileError);
-          // Don't fail the entire operation if profile creation fails
-        }
-      }
-
-      return { data: createdClient, error: null };
+      console.log(`ClientService: Successfully fetched ${processedClients.length} clients with profiles`);
+      return { data: processedClients, error: null };
     } catch (error) {
-      console.error('Error in createClientWithProfile:', error);
-      return { data: null, error: error as Error };
-    }
-  }
-
-  /**
-   * Update a client with profile
-   */
-  async updateClientWithProfile(clientId: string, client: Partial<Client>, profile?: Partial<ClientProfile>) {
-    try {
-      // Check if client exists
-      const { data: existingClient, error: getError } = await clientOperations.getClientById(clientId);
-      
-      if (getError) {
-        console.error('Error getting client:', getError);
-        throw getError;
-      }
-      
-      if (!existingClient) {
-        throw new Error('Client not found');
-      }
-
-      // Prepare client update data
-      const clientUpdate: Partial<DbClientInput> = {};
-      if (client.first_name !== undefined) clientUpdate.first_name = client.first_name;
-      if (client.last_name !== undefined) clientUpdate.last_name = client.last_name;
-      if (client.email !== undefined) clientUpdate.email = client.email;
-      if (client.phone !== undefined) clientUpdate.phone = client.phone;
-      if (client.status !== undefined) clientUpdate.status = client.status as any;
-
-      // Update the client
-      const { data: updatedClient, error: updateError } = await clientOperations.updateClient(
-        clientId, 
-        clientUpdate
-      );
-      
-      if (updateError) {
-        console.error('Error updating client:', updateError);
-        throw updateError;
-      }
-
-      // Update or create profile if provided
-      if (profile) {
-        try {
-          // Get existing profile
-          const { data: existingProfile, error: profileGetError } = await clientProfileOperations.getClientProfileByClientId(clientId);
-          
-          if (profileGetError && !profileGetError.message.includes('not found')) {
-            console.error('Error getting client profile:', profileGetError);
-            // Continue anyway
-          }
-          
-          // Prepare profile data
-          const profileData: Partial<DbClientProfileInput> = {
-            date_of_birth: profile.date_of_birth,
-            address: profile.address,
-            emergency_contact: profile.emergency_contact,
-            occupation: profile.occupation,
-            therapy_type: profile.therapy_type,
-            primary_concerns: profile.primary_concerns,
-            start_date: profile.start_date
-          };
-
-          if (existingProfile) {
-            // Update existing profile
-            const { error: profileUpdateError } = await clientProfileOperations.updateClientProfile(
-              existingProfile.id,
-              profileData
-            );
-            
-            if (profileUpdateError) {
-              console.error('Error updating client profile:', profileUpdateError);
-              // Continue anyway
-            }
-          } else {
-            // Create new profile
-            const { error: profileCreateError } = await clientProfileOperations.createClientProfile({
-              client_id: clientId,
-              ...profileData
-            } as DbClientProfileInput);
-            
-            if (profileCreateError) {
-              console.error('Error creating client profile:', profileCreateError);
-              // Continue anyway
-            }
-          }
-        } catch (profileError) {
-          console.error('Error updating client profile:', profileError);
-          // Continue anyway
-        }
-      }
-
+      console.error('Error in service layer - getClientsWithProfiles:', error);
+      // Return empty array instead of null to prevent UI errors
       return { 
-        data: { 
-          ...existingClient, 
-          ...updatedClient, 
-          ...client 
-        } as Client, 
-        error: null 
-      };
-    } catch (error) {
-      console.error('Error in updateClientWithProfile:', error);
-      return { data: null, error: error as Error };
-    }
-  }
-
-  /**
-   * Delete a client and its associated profile
-   */
-  async deleteClient(clientId: string) {
-    try {
-      // First try to delete the client profile
-      try {
-        const { data: profile } = await clientProfileOperations.getClientProfileByClientId(clientId);
-        if (profile) {
-          await clientProfileOperations.deleteClientProfile(profile.id);
-        }
-      } catch (profileError) {
-        console.error('Error deleting client profile:', profileError);
-        // Continue even if profile deletion fails
-      }
-
-      // Delete the client
-      const { data, error } = await clientOperations.deleteClient(clientId);
-      
-      if (error) {
-        console.error('Error deleting client:', error);
-        throw error;
-      }
-      
-      return { data: { success: true, id: clientId }, error: null };
-    } catch (error) {
-      console.error('Error in deleteClient:', error);
-      return { data: null, error: error as Error };
-    }
-  }
-
-  /**
-   * Get all clients for a therapist
-   */
-  async getClients(therapistId: string) {
-    try {
-      const { data, error } = await clientOperations.getClientsByTherapistId(therapistId);
-      
-      if (error) {
-        console.error('Error fetching clients:', error);
-        throw error;
-      }
-      
-      return { data, error: null };
-    } catch (error) {
-      console.error('Error in getClients:', error);
-      
-      // Fallback to mock data for development
-      return { 
-        data: mockClients.filter(c => c.therapist_id === therapistId), 
-        error: null 
+        data: [], 
+        error: new Error(`Service layer error: ${error instanceof Error ? error.message : String(error)}`) 
       };
     }
   }
@@ -290,250 +87,125 @@ export class ClientService {
   /**
    * Get a client by ID
    */
-  async getClientById(clientId: string) {
+  async getClientById(clientId: string): Promise<DbResponse<Client>> {
     try {
-      const { data, error } = await clientOperations.getClientById(clientId);
-      
-      if (error) {
-        console.error('Error fetching client:', error);
-        throw error;
-      }
-      
-      return { data, error: null };
+      return await clientOperations.getClientById(clientId);
     } catch (error) {
-      console.error('Error in getClientById:', error);
-      
-      // Fallback to mock data for development
-      const mockClient = mockClients.find(c => c.id === clientId);
+      console.error('Error in service layer - getClientById:', error);
       return { 
-        data: mockClient as Client || null, 
-        error: mockClient ? null : error as Error 
+        data: null, 
+        error: new Error(`Service layer error: ${error instanceof Error ? error.message : String(error)}`) 
       };
-    }
-  }
-
-  /**
-   * Get clients with their profile information
-   */
-  async getClientsWithProfiles(therapistId: string) {
-    try {
-      // Get all clients for the therapist
-      const { data: clients, error: clientsError } = await clientOperations.getClientsByTherapistId(therapistId);
-
-      // Check if there's an error or no clients found
-      if (clientsError || !clients) {
-        if (clientsError?.message?.includes('does not exist') || (clientsError as any)?.code === '42P01') {
-          console.log('Using mock client data because database table does not exist');
-          // Return mock data if the table doesn't exist
-          return { 
-            data: mockClients.filter(client => client.therapist_id === therapistId || therapistId === 'current-user-id'), 
-            error: null 
-          } as DbResponse<ClientWithProfile[]>;
-        }
-        // If other error, throw it to be caught below
-        if (clientsError) throw clientsError;
-      }
-
-      // If we have clients, fetch their profiles
-      const clientsWithProfiles: ClientWithProfile[] = [];
-
-      // For each client, try to fetch their profile
-      for (const client of clients || []) {
-        const clientWithProfile: ClientWithProfile = {
-          ...client,  
-          profile: undefined  // Initialize with no profile
-        };
-
-        // Try to get the client's profile
-        try {
-          const { data: profileData } = await clientProfileOperations.getClientProfileByClientId(client.id);
-          
-          if (profileData) {
-            clientWithProfile.profile = profileData as ClientProfile;
-          }
-          
-        } catch (profileError) {
-          console.error(`Error fetching profile for client ${client.id}:`, profileError);
-          // Continue without profile data
-        }
-
-        clientsWithProfiles.push(clientWithProfile);
-      }
-
-      return { data: clientsWithProfiles, error: null } as DbResponse<ClientWithProfile[]>;
-    } catch (error) {
-      console.error('Error fetching clients with profiles:', error);
-      
-      // Fallback to mock data for any error
-      console.log('Using mock client data due to error');
-      return { 
-        data: mockClients.filter(client => client.therapist_id === therapistId || therapistId === 'current-user-id'), 
-        error: null 
-      } as DbResponse<ClientWithProfile[]>;
     }
   }
 
   /**
    * Add a new client
-   * This method now uses our service role client to bypass RLS policies as needed
+   * This method ensures the therapist_id is always set to the authenticated user's ID
+   * to respect the RLS policies defined in the database
    */
-  async addClient(client: Partial<Client>, profile?: Partial<ClientProfile>) {
+  async addClient(client: Partial<Client>, profile?: Partial<ClientProfile>): Promise<DbResponse<Client>> {
     try {
-      console.log('ClientService.addClient called with service role support');
+      // Create the client
+      const result = await clientOperations.createClient(client as DbClientInput);
       
-      // Verify we have the necessary client data
-      if (!client.first_name || !client.last_name) {
-        throw new Error('First name and last name are required');
-      }
-
-      // Get the current authenticated user
-      const { data: authData } = await supabase.auth.getSession();
-      if (!authData?.session?.user?.id) {
-        throw new Error('Authentication required - you must be logged in');
+      if (result.error || !result.data) {
+        return result;
       }
       
-      const userId = authData.session.user.id;
-      console.log('Current authenticated user:', userId);
-
-      // Create the client with the user ID
-      // Our updated db-operations layer will handle therapist creation and RLS bypass
-      // via the service role client if needed
-      const clientInput: DbClientInput = {
-        therapist_id: client.therapist_id || '', // This will be overridden in the service layer
-        first_name: client.first_name || '',
-        last_name: client.last_name || '',
-        email: client.email,
-        phone: client.phone,
-        status: (client.status as 'Active' | 'On Hold' | 'Completed' | 'New') || 'New'
-      };
-
-      // The createClient function will now:
-      // 1. Find or create a therapist for the current user
-      // 2. Use the service role client to bypass RLS
-      // 3. Create the client with the correct therapist_id
-      const { data: clientData, error: clientError } = await clientOperations.createClient(clientInput);
-
-      if (clientError) {
-        console.error('Client creation error in service layer:', clientError);
-        throw clientError;
-      }
-
-      // If profile data is provided, create the profile
-      if (profile && clientData) {
+      // If we have profile data and the client was created successfully, create the profile
+      if (profile && result.data.id) {
         try {
-          // Create a proper profile input object
-          const profileInput = {
-            client_id: clientData.id,
-            date_of_birth: profile.date_of_birth,
-            address: profile.address,
-            occupation: profile.occupation,
-            emergency_contact: profile.emergency_contact,
-            primary_concerns: profile.primary_concerns,
-            therapy_type: profile.therapy_type,
-            start_date: profile.start_date
-          };
-          
-          // Create the profile using db-operations
-          const { error: profileError } = await clientProfileOperations.createClientProfile(profileInput);
-
-          if (profileError) {
-            console.warn('Profile creation warning:', profileError);
-            // Continue even if profile creation fails
-          }
+          await clientProfileOperations.createClientProfile({
+            ...profile as any,
+            client_id: result.data.id
+          });
         } catch (profileError) {
-          console.error('Error creating client profile:', profileError);
-          // Continue even if profile creation fails
+          console.warn('Error creating profile, but client was created:', profileError);
         }
       }
-
-      return { data: clientData as Client, error: null } as DbResponse<Client>;
+      
+      return result;
     } catch (error) {
-      console.error('Error adding client:', error);
-      return { data: null, error: error as Error };
+      console.error('Error in service layer - addClient:', error);
+      return { 
+        data: null, 
+        error: new Error(`Service layer error: ${error instanceof Error ? error.message : String(error)}`) 
+      };
     }
   }
 
   /**
    * Update a client
    */
-  async updateClient(clientId: string, client: Partial<Client>, profile?: Partial<ClientProfile>) {
+  async updateClient(clientId: string, client: Partial<Client>, profile?: Partial<ClientProfile>): Promise<DbResponse<Client>> {
     try {
-      // First get the current client data
-      const { data: currentClient, error: getError } = await clientOperations.getClientById(clientId);
+      // Update the client
+      const result = await clientOperations.updateClient(clientId, client as Partial<DbClientInput>);
       
-      if (getError) throw getError;
-      if (!currentClient) throw new Error('Client not found');
+      if (result.error || !result.data) {
+        return result;
+      }
       
-      // Create a valid update object for the client
-      const clientUpdate: Partial<DbClientInput> = {};
-      if (client.first_name !== undefined) clientUpdate.first_name = client.first_name;
-      if (client.last_name !== undefined) clientUpdate.last_name = client.last_name;
-      if (client.email !== undefined) clientUpdate.email = client.email;
-      if (client.phone !== undefined) clientUpdate.phone = client.phone;
-      if (client.status !== undefined) clientUpdate.status = client.status as any;
-      
-      // Update client data
-      const { data: updatedClient, error: clientError } = await clientOperations.updateClient(clientId, clientUpdate);
-
-      if (clientError) throw clientError;
-
-      // Update profile if provided
+      // If we have profile data and the client was updated successfully, update the profile
       if (profile) {
         try {
-          // First get the profile ID
-          const { data: profileData } = await clientProfileOperations.getClientProfileByClientId(clientId);
+          // First check if profile exists
+          const profileResult = await clientProfileOperations.getClientProfileByClientId(clientId);
           
-          if (profileData) {
-            // Create a valid profile update object
-            const profileUpdate: any = {};
-            if (profile.date_of_birth) profileUpdate.date_of_birth = profile.date_of_birth;
-            if (profile.address) profileUpdate.address = profile.address;
-            if (profile.emergency_contact) profileUpdate.emergency_contact = profile.emergency_contact;
-            if (profile.occupation) profileUpdate.occupation = profile.occupation;
-            if (profile.therapy_type) profileUpdate.therapy_type = profile.therapy_type;
-            if (profile.primary_concerns) profileUpdate.primary_concerns = profile.primary_concerns;
-            if (profile.start_date) profileUpdate.start_date = profile.start_date;
-            
-            // Update the profile
-            const { error: updateError } = await clientProfileOperations.updateClientProfile(profileData.id, profileUpdate);
-            
-            if (updateError) {
-              console.warn('Profile update warning:', updateError);
-              // Continue even if profile update fails
-            }
+          if (profileResult.data) {
+            // Update existing profile
+            await clientProfileOperations.updateClientProfile(profileResult.data.id, profile as any);
           } else {
-            // Create new profile if it doesn't exist
-            const profileInput = {
-              client_id: clientId,
-              date_of_birth: profile.date_of_birth,
-              address: profile.address,
-              emergency_contact: profile.emergency_contact,
-              occupation: profile.occupation,
-              therapy_type: profile.therapy_type,
-              primary_concerns: profile.primary_concerns,
-              start_date: profile.start_date
-            };
-            
-            const { error: createError } = await clientProfileOperations.createClientProfile(profileInput as any);
-            
-            if (createError) {
-              console.warn('Profile creation warning:', createError);
-              // Continue even if profile creation fails
-            }
+            // Create new profile
+            await clientProfileOperations.createClientProfile({
+              ...profile as any,
+              client_id: clientId
+            });
           }
         } catch (profileError) {
-          console.error('Error updating client profile:', profileError);
-          // Continue even without profile update
+          console.warn('Error updating profile, but client was updated:', profileError);
         }
       }
-
-      return { 
-        data: { ...updatedClient, ...client } as Client, 
-        error: null 
-      } as DbResponse<Client>;
+      
+      return result;
     } catch (error) {
-      console.error('Error updating client:', error);
-      return { data: null, error: error as Error };
+      console.error('Error in service layer - updateClient:', error);
+      return { 
+        data: null, 
+        error: new Error(`Service layer error: ${error instanceof Error ? error.message : String(error)}`) 
+      };
     }
+  }
+
+  /**
+   * Delete a client
+   */
+  async deleteClient(clientId: string): Promise<DbResponse<{ success: boolean }>> {
+    try {
+      return await clientOperations.deleteClient(clientId);
+    } catch (error) {
+      console.error('Error in service layer - deleteClient:', error);
+      return { 
+        data: null, 
+        error: new Error(`Service layer error: ${error instanceof Error ? error.message : String(error)}`) 
+      };
+    }
+  }
+
+  /**
+   * Create a client with profile
+   * @deprecated Use addClient instead
+   */
+  async createClientWithProfile(client: Partial<Client>, profile?: Partial<ClientProfile>): Promise<DbResponse<Client>> {
+    return this.addClient(client, profile);
+  }
+
+  /**
+   * Update a client with profile
+   * @deprecated Use updateClient instead
+   */
+  async updateClientWithProfile(clientId: string, client: Partial<Client>, profile?: Partial<ClientProfile>): Promise<DbResponse<Client>> {
+    return this.updateClient(clientId, client, profile);
   }
 }

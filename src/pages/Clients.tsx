@@ -9,13 +9,14 @@ import AddClientForm from "@/components/AddClientForm";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
 import { useAuth } from "@/contexts/AuthContext";
-import { ClientService, ClientWithProfile } from "@/services/ClientService";
 import { toast } from "sonner";
+import * as clientOperations from '@/services/db-operations/clients';
+import * as clientProfileOperations from '@/services/db-operations/clientProfiles';
+import { ClientWithProfile } from '@/services/db-operations/clients';
 
 export default function Clients() {
   const { user } = useAuth();
-  const clientService = new ClientService();
-  const [clients, setClients] = useState<ClientWithProfile[]>([]);
+  const [clients, setClients] = useState<ClientDisplay[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showAddDialog, setShowAddDialog] = useState(false);
@@ -26,34 +27,162 @@ export default function Clients() {
   const [deleteClientId, setDeleteClientId] = useState<string | null>(null);
   const navigate = useNavigate();
 
+  // Extended client interface to add UI-specific fields
+  interface ClientDisplay extends ClientWithProfile {
+    name?: string;
+    session_count?: number;
+    last_session_date?: string;
+  }
+
   // Function to fetch clients (defined outside useEffect to be accessible throughout component)
   const fetchClients = async () => {
-    if (!user?.id) return;
+    if (!user?.id) {
+      console.error('Cannot fetch clients: No user ID available');
+      toast.error("You must be logged in to view clients");
+      return;
+    }
     
     try {
       setLoading(true);
-      const { data, error } = await clientService.getClientsWithProfiles(user.id);
+      console.log('Fetching clients for therapist ID:', user.id);
       
-      if (error) {
-        setError(error.message);
-        toast.error("Failed to load clients");
-        return;
+      // Import auth functions to check current session
+      const { supabase } = await import('../lib/supabase');
+      const { data: authData } = await supabase.auth.getSession();
+      console.log('Current auth session:', authData?.session ? 'Valid' : 'None', 
+                  'User ID:', authData?.session?.user?.id);
+      
+      if (!authData?.session?.user?.id) {
+        console.warn('No active auth session found while fetching clients');
       }
       
-      if (data) {
-        setClients(data);
+      // Try using the database operations directly
+      try {
+        console.log('Fetching clients via database operations...');
+        const result = await clientOperations.getClientsWithProfiles(user.id);
+        console.log('Client fetch result:', result);
+        
+        if (result.error) {
+          console.error('Error fetching clients via operations:', result.error);
+          throw result.error;
+        }
+        
+        if (result.data && result.data.length > 0) {
+          console.log('Clients loaded successfully:', result.data.length, 'clients found');
+          console.log('First client therapist ID:', result.data[0].therapist_id, 'Current user ID:', user.id);
+          
+          // Process clients to add UI-specific fields
+          const processedClients = result.data.map(client => ({
+            ...(client as ClientDisplay),
+            name: (client as ClientDisplay).name || `${client.first_name} ${client.last_name}`,
+            session_count: 0, // Default values, could be updated later
+            last_session_date: null
+          })) as ClientDisplay[];
+          
+          setClients(processedClients);
+          return; // Successfully loaded clients, exit the function
+        }
+        
+        console.warn('No clients found via operations, trying direct DB access...');
+      } catch (operationsErr) {
+        console.error('Exception in operations client fetch:', operationsErr);
+        // Continue to direct DB access as fallback
+      }
+      
+      // FALLBACK: Direct database access if operations layer failed
+      try {
+        console.log('Attempting direct database access to find clients...');
+        const { supabase } = await import('../lib/supabase');
+        
+        // First we need to find the therapist record(s) for this user
+        const { data: therapists } = await supabase
+          .from('therapists')
+          .select('id')
+          .eq('user_id', user.id);
+          
+        console.log('Direct DB: Found therapist records:', therapists);
+        
+        if (therapists && therapists.length > 0) {
+          // We found therapist(s) for this user, now get their clients
+          const therapistId = therapists[0].id;
+          console.log('Direct DB: Using therapist ID:', therapistId);
+          
+          const { data: directClients, error: clientsError } = await supabase
+            .from('clients')
+            .select('*, profile:client_profiles(*)')
+            .eq('therapist_id', therapistId);
+            
+          if (clientsError) {
+            console.error('Direct DB: Error fetching clients:', clientsError);
+            throw clientsError;
+          }
+          
+          if (directClients && directClients.length > 0) {
+            console.log('Direct DB: Found', directClients.length, 'clients');
+            
+            // Transform the data to match our extended interface
+            const formattedClients = directClients.map(client => ({
+              ...(client as ClientDisplay),
+              name: (client as ClientDisplay).name || `${client.first_name} ${client.last_name}`,
+              session_count: 0,
+              last_session_date: null
+            })) as ClientDisplay[];
+            
+            setClients(formattedClients);
+            return; // Successfully loaded clients, exit the function
+          }
+        }
+        
+        // If we reach here, we couldn't find any clients
+        console.warn('Direct DB: No clients found for user:', user.id);
+        setClients([]);
+      } catch (directDbErr) {
+        console.error('Direct DB access error:', directDbErr);
+        setError(directDbErr.message);
+        toast.error("Failed to load clients: " + directDbErr.message);
+        setClients([]);
       }
     } catch (err: any) {
+      console.error('Exception in fetchClients:', err);
       setError(err.message);
-      toast.error("An error occurred while loading clients");
+      toast.error("An error occurred while loading clients: " + err.message);
     } finally {
       setLoading(false);
     }
   };
 
-  // Fetch clients on component load
+  // Fetch clients on component load and ensure user session is fresh
   useEffect(() => {
-    fetchClients();
+    const refreshAndFetch = async () => {
+      try {
+        // Import supabase directly to ensure fresh auth context
+        const { supabase } = await import('../lib/supabase');
+        
+        // Force session refresh to get fresh tokens before fetching clients
+        const { data: refreshData, error: refreshError } = await supabase.auth.refreshSession();
+        if (refreshError) {
+          console.error('Error refreshing session:', refreshError);
+        } else {
+          console.log('Session refreshed successfully, user ID:', refreshData?.session?.user?.id);
+        }
+        
+        // Now fetch clients with refreshed tokens
+        await fetchClients();
+      } catch (err) {
+        console.error('Error in session refresh or fetch:', err);
+      }
+    };
+    
+    refreshAndFetch();
+    
+    // Set up a timer to refresh clients data every 30 seconds
+    const refreshTimer = setInterval(() => {
+      console.log('Auto-refreshing clients data...');
+      fetchClients();
+    }, 30000);
+    
+    // Clean up the timer when component unmounts
+    return () => clearInterval(refreshTimer);
   }, [user?.id]);
 
   const handleAddClient = async (data: any) => {
@@ -72,7 +201,7 @@ export default function Clients() {
       console.log('Creating client via service layer with user:', user.id);
       
       // Use the client service's addClient method which calls the service layer
-      const { data: newClient, error } = await clientService.addClient({
+      const { data: newClient, error } = await clientOperations.createClient({
         first_name: firstName,
         last_name: lastName,
         email: data.email,
@@ -105,30 +234,51 @@ export default function Clients() {
 
       // Update the client with the profile data
       try {
-        // Since we've already created the client, now let's add the profile separately
-        const { error: profileError } = await clientService.updateClient(newClient.id, {}, profileData);
-        
+        const { error: profileError } = await clientProfileOperations.createClientProfile(profileData);
+
         if (profileError) {
-          console.error('Profile creation error:', profileError);
-          toast.error(`Failed to create client profile: ${profileError.message}`);
-          // We continue anyway since the client was created successfully
+          console.warn('Profile update warning:', profileError);
+          // Continue even if profile update fails
         }
-      } catch (profileUpdateError: any) {
-        console.error('Profile update error:', profileUpdateError);
-        // Continue since client was still created
+      } catch (profileErr) {
+        console.warn('Error updating profile:', profileErr);
+        // Continue even if profile update fails
       }
-      toast.success("Client added successfully");
+
       setShowAddDialog(false);
+      toast.success("Client added successfully");
       
-      // Refresh the client list
-      fetchClients();
+      // First fetch the clients to refresh the list
+      await fetchClients();
+      
+      // Then manually add the new client to the state if it's not already there
+      // This ensures the UI updates immediately even if there's a delay in the database
+      setClients(prevClients => {
+        // Check if the client is already in the list
+        const exists = prevClients.some(c => c.id === newClient.id);
+        if (!exists) {
+          // Create a new client with profile to add to the state
+          const clientWithProfile: ClientWithProfile = {
+            ...newClient,
+            profile: profileData as any, // Add the profile data
+          };
+          return [...prevClients, clientWithProfile as ClientDisplay];
+        }
+        return prevClients;
+      });
     } catch (err: any) {
-      toast.error(err.message || "Failed to add client");
+      console.error('Error in handleAddClient:', err);
+      toast.error(err.message || "An error occurred while adding the client");
+    } finally {
+      setLoading(false);
     }
   };
 
   const handleEditClient = async (data: any) => {
-    if (!editClient || !user) return;
+    if (!editClient || !user) {
+      toast.error("You must be logged in to edit clients");
+      return;
+    }
 
     try {
       setLoading(true);
@@ -136,96 +286,80 @@ export default function Clients() {
       const nameParts = data.name.split(' ');
       const firstName = nameParts[0] || '';
       const lastName = nameParts.slice(1).join(' ') || '';
-
-      // Import supabase directly to ensure fresh auth context
-      const { supabase } = await import('../lib/supabase');
-
-      // Force session refresh to get fresh tokens
-      await supabase.auth.refreshSession();
       
-      console.log('Updating client directly with Supabase, client ID:', editClient.id);
+      console.log('Updating client via ClientService, client ID:', editClient.id);
       
-      // Update the client directly with Supabase
-      const clientResult = await supabase
-        .from('clients')
-        .update({
-          first_name: firstName,
-          last_name: lastName,
-          email: data.email,
-          phone: data.phone,
-          status: (data.status || editClient.status) as 'Active' | 'On Hold' | 'Completed' | 'New',
-          updated_at: new Date().toISOString(),
-          // Keep the original therapist_id value
-          therapist_id: user.id
-        })
-        .eq('id', editClient.id)
-        .select()
-        .single();
-        
-      if (clientResult.error) {
-        console.error('Client update error:', clientResult.error);
-        toast.error(`Failed to update client: ${clientResult.error.message}`);
+      // Prepare client data update
+      const clientUpdateData = {
+        first_name: firstName,
+        last_name: lastName,
+        email: data.email,
+        phone: data.phone,
+        status: (data.status || editClient.status) as 'Active' | 'On Hold' | 'Completed' | 'New',
+      };
+      
+      // Prepare profile data update
+      const profileUpdateData = {
+        date_of_birth: data.dob,
+        address: data.address,
+        occupation: data.occupation,
+        emergency_contact: data.emergencyContact,
+        primary_concerns: data.primaryConcerns ? data.primaryConcerns.split(',').map((s: string) => s.trim()) : [],
+        therapy_type: data.therapyType,
+        start_date: data.startDate
+      };
+
+      // Update client and profile in one call using our service layer
+      const { data: updatedClient, error } = await clientOperations.updateClient(editClient.id, clientUpdateData);
+      
+      if (error) {
+        console.error('Client update failed:', error);
+        toast.error(`Failed to update client: ${error.message}`);
         setLoading(false);
         return;
       }
       
-      const updatedClient = clientResult.data;
-      
-      // Update the client profile if it exists
-      if (editClient.profile) {
-        const profileResult = await supabase
-          .from('client_profiles')
-          .update({
-            date_of_birth: data.dob,
-            address: data.address,
-            occupation: data.occupation,
-            emergency_contact: data.emergencyContact,
-            primary_concerns: data.primaryConcerns ? data.primaryConcerns.split(',').map((s: string) => s.trim()) : [],
-            therapy_type: data.therapyType,
-            start_date: data.startDate,
-            updated_at: new Date().toISOString(),
-          })
-          .eq('client_id', editClient.id)
-          .select();
-          
-        if (profileResult.error) {
-          console.warn('Profile update warning:', profileResult.error);
+      // Update the client profile
+      try {
+        const { error: profileError } = await clientProfileOperations.updateClientProfile(editClient.id, profileUpdateData);
+
+        if (profileError) {
+          console.warn('Profile update warning:', profileError);
           // Continue even if profile update fails
         }
-      } else {
-        // Create a new profile if it doesn't exist
-        const profileResult = await supabase
-          .from('client_profiles')
-          .insert({
-            client_id: editClient.id,
-            date_of_birth: data.dob,
-            address: data.address,
-            occupation: data.occupation,
-            emergency_contact: data.emergencyContact,
-            primary_concerns: data.primaryConcerns ? data.primaryConcerns.split(',').map((s: string) => s.trim()) : [],
-            therapy_type: data.therapyType,
-            start_date: data.startDate,
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString()
-          })
-          .select();
-          
-        if (profileResult.error) {
-          console.warn('Profile creation warning:', profileResult.error);
-          // Continue even if profile creation fails
-        }
+      } catch (profileErr) {
+        console.warn('Error updating profile:', profileErr);
+        // Continue even if profile update fails
       }
+      
+      // Immediately update the client in the state for instant UI feedback
+      setClients(prevClients => {
+        return prevClients.map(client => {
+          if (client.id === editClient.id) {
+            // Create updated client with profile
+            return {
+              ...client,
+              ...clientUpdateData,
+              profile: {
+                ...client.profile,
+                ...profileUpdateData
+              }
+            } as ClientDisplay;
+          }
+          return client;
+        });
+      });
       
       toast.success("Client updated successfully");
       setShowEditDialog(false);
-      
-      // Refresh the client list to ensure we have the latest data
-      fetchClients();
-      setLoading(false);  
       setEditClient(null);
+      
+      // Also refresh data from the server to ensure consistency
+      await fetchClients();
     } catch (err: any) {
       console.error('Error in client update:', err);
       toast.error(err.message || "Failed to update client");
+    } finally {
       setLoading(false);
     }
   };
@@ -444,11 +578,11 @@ export default function Clients() {
                   <CardContent className="p-6 flex flex-col gap-4 h-full">
                     <div className="flex items-center gap-4">
                       <div className="flex items-center justify-center w-14 h-14 rounded-full bg-therapy-purple/10 text-therapy-purple text-2xl font-bold">
-                        {client.name?.split(" ").map(n => n[0]).join("") || "?"}
+                        {(client as ClientDisplay).name?.split(" ").map(n => n[0]).join("") || "?"}
                       </div>
                       <div>
                         <Link to={`/therapist/clients/${client.id}`} className="text-xl font-bold text-therapy-purple hover:underline">
-                          {client.name || "Unnamed Client"}
+                          {(client as ClientDisplay).name || "Unnamed Client"}
                         </Link>
                         <div className="text-gray-500 text-sm">
                           {client.profile?.date_of_birth 
@@ -458,8 +592,8 @@ export default function Clients() {
                       </div>
                     </div>
                     <div className="flex flex-col gap-1 text-base">
-                      <div><span className="font-semibold text-therapy-gray">Sessions:</span> {client.session_count || 0}</div>
-                      <div><span className="font-semibold text-therapy-gray">Last Session:</span> {client.last_session_date || 'No sessions yet'}</div>
+                      <div><span className="font-semibold text-therapy-gray">Sessions:</span> {(client as ClientDisplay).session_count || 0}</div>
+                      <div><span className="font-semibold text-therapy-gray">Last Session:</span> {(client as ClientDisplay).last_session_date ? new Date((client as ClientDisplay).last_session_date).toLocaleDateString() : 'None'}</div>
                     </div>
                     <div className="flex items-center gap-2 mt-2">
                       <span className={`inline-block px-3 py-1 rounded-full text-xs font-semibold shadow-sm ${
