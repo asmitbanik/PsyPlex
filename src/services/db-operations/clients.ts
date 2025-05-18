@@ -147,12 +147,13 @@ export async function getClientById(clientId: string): Promise<DbResponse<Client
     const { data, error } = await supabase
       .from('clients')
       .select('*')
-      .eq('id', clientId)
-      .single();
+      .eq('id', clientId);
 
     if (error) throw error;
     
-    return { data, error: null };
+    // Return the first client if exists, or null if no clients found
+    const client = data && data.length > 0 ? data[0] : null;
+    return { data: client, error: null };
   } catch (error) {
     console.error('Error fetching client:', error);
     return { data: null, error: error as Error };

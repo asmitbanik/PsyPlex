@@ -5,10 +5,13 @@ export interface ClinicalNote {
   therapyType: string;
   content: {
     insights: any;
-    recommendations: {
+    recommendations?: {
       nextSession: string[];
       homework: string[];
     };
+    // Optional fields for backward compatibility
+    nextSession?: string[];
+    homework?: string[];
   };
   clientId?: string;
   tags?: string[];

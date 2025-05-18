@@ -48,12 +48,13 @@ export async function getClientProfileByClientId(clientId: string): Promise<DbRe
     const { data, error } = await supabase
       .from('client_profiles')
       .select('*')
-      .eq('client_id', clientId)
-      .single();
+      .eq('client_id', clientId);
 
     if (error) throw error;
     
-    return { data, error: null };
+    // Return the first profile if exists, or null if no profiles found
+    const profile = data && data.length > 0 ? data[0] : null;
+    return { data: profile, error: null };
   } catch (error) {
     console.error('Error fetching client profile:', error);
     return { data: null, error: error as Error };
@@ -70,12 +71,13 @@ export async function getClientProfileById(profileId: string): Promise<DbRespons
     const { data, error } = await supabase
       .from('client_profiles')
       .select('*')
-      .eq('id', profileId)
-      .single();
+      .eq('id', profileId);
 
     if (error) throw error;
     
-    return { data, error: null };
+    // Return the first profile if exists, or null if no profiles found
+    const profile = data && data.length > 0 ? data[0] : null;
+    return { data: profile, error: null };
   } catch (error) {
     console.error('Error fetching client profile by ID:', error);
     return { data: null, error: error as Error };

@@ -19,13 +19,24 @@ import { toast } from "sonner";
 
 // Helper to convert Note from NotesService to ClinicalNote for UI display
 function convertToUiNote(note: Note): ClinicalNote {
+  // Ensure content has the expected structure
+  const content = note.content || { insights: [] };
+  
+  // Make sure recommendations is always defined
+  if (!content.recommendations) {
+    content.recommendations = {
+      nextSession: content.nextSession || [],
+      homework: content.homework || []
+    };
+  }
+  
   return {
     id: note.id || '',
     title: note.title,
-    therapyType: note.therapyType,
+    therapyType: note.therapyType || 'General',
     date: note.date || note.created_at || new Date().toISOString(),
     tags: note.tags || [],
-    content: note.content,
+    content: content,
     clientId: note.clientId
   };
 }
@@ -193,27 +204,41 @@ const Notes = () => {
       return;
     }
 
+    if (!noteData.clientId) {
+      toast.error("You must select a client");
+      return;
+    }
+
     try {
-      // Format for the database
+      console.log("Saving note with client ID:", noteData.clientId);
+      
+      // Format for the database - split content into paragraphs to be handled as insights
+      const insights = noteData.content.split('\n')
+        .map(paragraph => paragraph.trim())
+        .filter(paragraph => paragraph.length > 0);
+      
       const newNote: Note = {
         title: noteData.title,
-        therapyType: noteData.therapyType,
+        therapyType: noteData.therapyType || 'General',
         content: {
-          insights: [noteData.content],
+          insights: insights.length > 0 ? insights : [noteData.content],
           recommendations: {
             nextSession: [],
             homework: []
           }
         },
-        tags: noteData.tags,
+        tags: noteData.tags || [],
         clientId: noteData.clientId,
         therapistId: user.id
       };
       
+      // For debugging
+      console.log("Saving note with data:", JSON.stringify(newNote, null, 2));
+      
       const { data, error } = await notesService.saveNote(newNote, user.id);
       
       if (error) {
-        toast.error("Failed to save note");
+        toast.error("Failed to save note: " + (error.message || "Unknown error"));
         console.error("Error saving note:", error);
         return;
       }
