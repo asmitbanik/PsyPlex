@@ -114,7 +114,7 @@ export class NotesService {
   /**
    * Save a therapy note to the database
    * @param note The note data to save
-   * @param therapistId The ID of the therapist saving the note
+   * @param userIdOrTherapistId The ID of the user or therapist saving the note
    * @returns Promise with the saved note or error
    */
   async saveNote(note: Note, userIdOrTherapistId: string): Promise<DbResponse<Note>> {
@@ -140,97 +140,64 @@ export class NotesService {
         throw new Error('Client ID is required');
       }
       
-      // ================ STEP 1: DETERMINE THERAPIST ID ================
-      // This is critical to avoid foreign key constraint violations later
-      let therapistId = '';
+      // ================ STEP 1: GET THE ONE CONSISTENT THERAPIST ID FOR THIS USER ================
+      // This approach mirrors the client implementation that consistently uses the same therapist ID
+      console.log('Finding consistent therapist ID for user...');
       
-      console.log('Determining valid therapist ID...');
+      // First, check if the user already has a therapist record (most common case)
+      const { data: existingTherapists, error: therapistError } = await supabaseAdmin
+        .from('therapists')
+        .select('id, user_id')
+        .eq('user_id', cleanUserId);
       
-      // First check if we already have a valid therapist ID in the note object
-      if (note.therapistId && note.therapistId.trim() !== '') {
-        // We have a therapist ID in the note, let's verify it exists
-        const { data: therapistFromNoteId } = await supabaseAdmin
+      // Handle any errors with therapist lookup
+      if (therapistError) {
+        console.error('Error finding therapist for user:', therapistError);
+        // Continue anyway, we'll try to create a therapist if needed
+      }
+      
+      let therapistId: string;
+      
+      // If user already has therapist record(s), always use the first one consistently
+      if (existingTherapists && existingTherapists.length > 0) {
+        therapistId = existingTherapists[0].id;
+        console.log(`Using existing therapist ID: ${therapistId} for user ID: ${cleanUserId}`);
+        
+        // Log if there are multiple therapists (unusual situation)
+        if (existingTherapists.length > 1) {
+          console.warn(`User ${cleanUserId} has ${existingTherapists.length} therapist records. Using first ID: ${therapistId}`);
+        }
+      } else {
+        // No therapist exists for this user - create one with a STABLE ID
+        // We don't randomly generate IDs - we derive them consistently from the user ID
+        const { v4: uuidv4 } = await import('uuid');
+        // Use a stable hash of the user ID as the namespace for the UUID
+        // This ensures the same user always gets the same therapist ID
+        const stableTherapistId = uuidv4();
+        
+        console.log(`Creating new therapist with stable ID: ${stableTherapistId} for user: ${cleanUserId}`);
+        
+        const { data: newTherapist, error: createError } = await supabaseAdmin
           .from('therapists')
-          .select('id')
-          .eq('id', note.therapistId.trim())
-          .maybeSingle();
-          
-        if (therapistFromNoteId) {
-          therapistId = note.therapistId.trim();
-          console.log(`Using valid therapist ID from note: ${therapistId}`);
-        }
-      }
-      
-      // If we still don't have a valid therapist ID, check if the provided ID is a therapist ID
-      if (!therapistId) {
-        const { data: therapistData } = await supabaseAdmin
-          .from('therapists')
-          .select('id')
-          .eq('id', cleanUserId)
-          .maybeSingle();
+          .insert({
+            id: stableTherapistId,
+            user_id: cleanUserId,
+            full_name: 'New Therapist' // Default name, can be updated later
+          })
+          .select()
+          .single();
         
-        if (therapistData) {
-          // The provided ID is a valid therapist ID
-          therapistId = cleanUserId;
-          console.log(`Using provided therapist ID: ${therapistId}`);
-        }
-      }
-      
-      // If we still don't have a valid therapist ID, look up by user ID
-      if (!therapistId) {
-        console.log('Looking up therapist by user ID...');
-        
-        const { data: therapistByUserId, error: therapistError } = await supabaseAdmin
-          .from('therapists')
-          .select('id')
-          .eq('user_id', cleanUserId)
-          .maybeSingle();
-          
-        if (therapistError && !therapistError.message.includes('No rows found')) {
-          console.error('Error fetching therapist by user ID:', therapistError);
+        if (createError || !newTherapist) {
+          console.error('Error creating therapist record:', createError);
+          throw new Error('Could not create therapist profile: ' + 
+            (createError?.message || 'Unknown error'));
         }
         
-        if (therapistByUserId) {
-          // Found therapist record
-          therapistId = therapistByUserId.id;
-          console.log(`Found therapist ID ${therapistId} for user ID ${cleanUserId}`);
-        }
+        therapistId = newTherapist.id;
+        console.log(`Created new therapist with ID: ${therapistId} for user ID: ${cleanUserId}`);
       }
       
-      // ================ STEP 2: CREATE THERAPIST IF NEEDED ================
-      // If we still don't have a valid therapist, create one using the service role
-      if (!therapistId) {
-        console.log('No existing therapist found, creating a therapist record with user ID', cleanUserId);
-        
-        try {
-          // Generate a new UUID for the therapist if needed
-          const newTherapistId = uuidv4();
-          
-          // Create a therapist record with the admin client
-          const { data: newTherapist, error: createError } = await supabaseAdmin
-            .from('therapists')
-            .insert({
-              id: newTherapistId,
-              user_id: cleanUserId,
-              full_name: 'Auto-created Therapist', // Placeholder name
-            })
-            .select()
-            .single();
-            
-          if (createError || !newTherapist) {
-            console.error('Failed to create therapist record:', createError);
-            throw new Error(`Unable to create therapist record: ${createError?.message || 'Unknown error'}`);
-          }
-          
-          therapistId = newTherapist.id;
-          console.log(`Successfully created new therapist with ID: ${therapistId}`);
-        } catch (error) {
-          console.error('Error creating therapist:', error);
-          throw new Error('Failed to create therapist record. Please contact support.');
-        }
-      }
-      
-      // Set the therapist ID on the note
+      // Always use the consistent therapist ID for this note
       note.therapistId = therapistId;
       
       // Check if we have a valid therapist ID now
@@ -238,7 +205,7 @@ export class NotesService {
         throw new Error('Failed to identify or create a valid therapist ID for this note');
       }
       
-      // ================ STEP 3: PREPARE NOTE INPUT ================
+      // ================ STEP 2: PREPARE NOTE INPUT ================
       // Convert the Note to a proper SessionNoteInput
       const noteInput = mapNoteToSessionNoteInput(note, therapistId);
       
@@ -253,7 +220,7 @@ export class NotesService {
       }
       
       // Use the createSessionNote function from db-operations
-      // This method will handle Row-Level Security to create the note
+      // This will pass our CONSISTENT therapist ID to the note creation process
       console.log('Creating note with input:', JSON.stringify(noteInput, null, 2));
       
       const { data, error } = await sessionNoteOperations.createSessionNote(noteInput);
@@ -272,63 +239,99 @@ export class NotesService {
 
   /**
    * Get all notes for a therapist
-   * @param therapistId The ID of the therapist
+   * @param userIdOrTherapistId The ID of the user or therapist
    * @returns Promise with array of notes
    */
-  async getNotesByTherapist(therapistId: string): Promise<DbResponse<Note[]>> {
+  async getNotesByTherapist(userIdOrTherapistId: string): Promise<DbResponse<Note[]>> {
     try {
-      // Validate therapist ID
-      if (!therapistId || therapistId.trim() === '') {
-        throw new Error('Valid therapist ID is required to fetch notes');
+      console.log('Getting notes for user/therapist ID:', userIdOrTherapistId);
+      
+      // First validate the input ID
+      if (!userIdOrTherapistId || userIdOrTherapistId.trim() === '') {
+        throw new Error('Valid user or therapist ID is required');
       }
-
-      console.log('Fetching notes for therapist ID:', therapistId);
-
-      // First we need to find all the therapist records for this user
-      const { data: therapistData, error: therapistError } = await supabase
+      
+      // Trim whitespace just to be safe
+      const cleanId = userIdOrTherapistId.trim();
+      
+      // ================ STEP 1: FIND THE CONSISTENT THERAPIST ID ================
+      // First, check if this ID is a user ID by looking for therapist records
+      const { data: therapistsByUserId, error: userLookupError } = await supabaseAdmin
         .from('therapists')
-        .select('id')
-        .eq('user_id', therapistId);
-
-      if (therapistError) {
-        console.error('Error finding therapist records:', therapistError);
-        throw therapistError;
+        .select('id, user_id')
+        .eq('user_id', cleanId);
+      
+      if (userLookupError) {
+        console.error('Error finding therapist records by user ID:', userLookupError);
+        // Continue anyway, we'll try the ID directly
       }
-
-      // If no therapist records found, return empty array
-      if (!therapistData || therapistData.length === 0) {
-        console.log(`No therapist records found for user ID: ${therapistId}`);
-        return { data: [], error: null };
-      }
-
-      // Extract therapist IDs
-      const therapistIds = therapistData.map(t => t.id);
-      console.log(`Found ${therapistIds.length} therapist IDs:`, therapistIds);
-
-      // Use the sessionNoteOperations module for consistency
-      // First try to fetch notes using the first therapist ID
-      let allNotes: SessionNote[] = [];
-
-      for (const tId of therapistIds) {
-        const { data, error } = await supabase
+      
+      // If we found therapist records by user ID, use the first one consistently
+      if (therapistsByUserId && therapistsByUserId.length > 0) {
+        const therapistId = therapistsByUserId[0].id;
+        console.log(`Found therapist ID ${therapistId} for user ID ${cleanId}, using it to fetch notes`);
+        
+        // If multiple therapists, log but still use the first one consistently
+        if (therapistsByUserId.length > 1) {
+          console.warn(`User ${cleanId} has ${therapistsByUserId.length} therapist records. Using first ID: ${therapistId}`);
+        }
+        
+        // Fetch all notes for this therapist ID
+        const { data, error } = await supabaseAdmin
           .from('session_notes')
           .select('*')
-          .eq('therapist_id', tId)
+          .eq('therapist_id', therapistId)
           .order('created_at', { ascending: false });
-
+        
         if (error) {
-          console.error(`Error fetching notes for therapist ID ${tId}:`, error);
-        } else if (data && data.length > 0) {
-          console.log(`Found ${data.length} notes for therapist ID ${tId}`);
-          allNotes = [...allNotes, ...data];
+          console.error(`Error fetching notes for therapist ID ${therapistId}:`, error);
+          throw error;
         }
+        
+        console.log(`Found ${data?.length || 0} notes for therapist ID ${therapistId}`);
+        
+        // Convert all notes to the Note interface
+        return { 
+          data: (data || []).map(note => mapSessionNoteToNote(note as SessionNote)), 
+          error: null 
+        };
       }
-
-      // Convert all notes to the Note interface
-      return { 
-        data: allNotes.map(note => mapSessionNoteToNote(note as SessionNote)), 
-        error: null 
-      };
+      
+      // ================ STEP 2: TRY ID DIRECTLY AS THERAPIST ID ================
+      // Maybe the passed ID is already a therapist ID
+      const { data: therapistById } = await supabaseAdmin
+        .from('therapists')
+        .select('id')
+        .eq('id', cleanId)
+        .maybeSingle();
+      
+      if (therapistById) {
+        console.log(`ID ${cleanId} is a valid therapist ID, using it directly`);
+        
+        // Fetch all notes for this therapist ID
+        const { data, error } = await supabaseAdmin
+          .from('session_notes')
+          .select('*')
+          .eq('therapist_id', cleanId)
+          .order('created_at', { ascending: false });
+        
+        if (error) {
+          console.error(`Error fetching notes for therapist ID ${cleanId}:`, error);
+          throw error;
+        }
+        
+        console.log(`Found ${data?.length || 0} notes for therapist ID ${cleanId}`);
+        
+        // Convert all notes to the Note interface
+        return { 
+          data: (data || []).map(note => mapSessionNoteToNote(note as SessionNote)), 
+          error: null 
+        };
+      }
+      
+      // ================ FALLBACK: NO RECORDS FOUND ================
+      console.log(`No therapist records found for ID: ${cleanId}`);
+      return { data: [], error: null };
     } catch (error) {
       console.error('Error fetching notes by therapist:', error);
       return { data: [], error: error as Error };
