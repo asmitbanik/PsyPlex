@@ -13,7 +13,7 @@
 </div>
 
 ## 📋 Overview
-
+"clients r classy but we r classier"
 PsyPlex is a comprehensive platform that leverages AI to empower mental health professionals with innovative tools for better client care. The application streamlines client management, session notes, therapy insights, and progress tracking in one intuitive interface.
 
 ## ✨ Features
