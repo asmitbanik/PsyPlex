@@ -321,6 +321,76 @@ const Notes = () => {
       }
     }
   };
+  
+  // Handle editing a note
+  const handleEditNote = async (noteId: string, updatedNote: Partial<ClinicalNote>) => {
+    if (!user?.id || !noteId) return false;
+    
+    try {
+      console.log('Updating note with ID:', noteId, 'with data:', updatedNote);
+      
+      // Convert ClinicalNote format to the format expected by the notesService
+      const noteUpdateData: Partial<Note> = {
+        title: updatedNote.title,
+        therapyType: updatedNote.therapyType,
+        tags: updatedNote.tags,
+        content: updatedNote.content
+      };
+      
+      // Call the notesService to update the note in the database
+      const { data, error } = await notesService.updateNote(noteId, noteUpdateData);
+      
+      if (error) {
+        console.error('Error updating note:', error);
+        toast.error("Failed to update note: " + error.message);
+        return false;
+      }
+      
+      if (!data) {
+        console.error('No data returned from note update');
+        toast.error("Failed to update note: No data returned");
+        return false;
+      }
+      
+      // Convert the returned note to UI format
+      const updatedUiNote = convertToUiNote(data);
+      
+      // Update the allNotes state
+      setAllNotes(prev => prev.map(note => 
+        note.id === noteId ? updatedUiNote : note
+      ));
+      
+      // Update the clientsWithNotes state
+      setClientsWithNotes(prev => {
+        return prev.map(group => {
+          // Find if this group contains the updated note
+          const noteIndex = group.notes.findIndex(note => note.id === noteId);
+          
+          if (noteIndex >= 0) {
+            // Create a new array of notes with the updated note
+            const updatedNotes = [...group.notes];
+            updatedNotes[noteIndex] = updatedUiNote;
+            
+            // Return updated group
+            return {
+              ...group,
+              notes: updatedNotes
+            };
+          }
+          
+          // This group doesn't have the note, return it unchanged
+          return group;
+        });
+      });
+      
+      toast.success("Note updated successfully");
+      return true;
+    } catch (err: any) {
+      console.error("Error in handleEditNote:", err);
+      toast.error("An error occurred while updating the note: " + (err.message || "Unknown error"));
+      return false;
+    }
+  };
 
   useEffect(() => {
     if (filterDialogOpen && tagSearchInputRef.current) {
@@ -411,6 +481,7 @@ const Notes = () => {
             <NotesGrid 
               notes={filteredNotes} 
               onDeleteNote={handleDeleteNote}
+              onEditNote={handleEditNote}
             />
           ) : (
             <div className="text-center py-16">
@@ -431,6 +502,7 @@ const Notes = () => {
             <ClientNotesSection 
               clients={clientsWithNotes} 
               onDeleteNote={handleDeleteNote}
+              onEditNote={handleEditNote}
             />
           ) : (
             <div className="text-center py-16">

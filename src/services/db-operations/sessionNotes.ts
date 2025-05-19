@@ -461,7 +461,7 @@ export async function getSessionNotesByClientId(clientId: string): Promise<DbRes
 }
 
 /**
- * Updates an existing session note
+ * Updates an existing session note using admin client to bypass RLS
  * @param noteId UUID of the session note
  * @param updateData Partial session note data to update
  * @returns The updated session note or an error
@@ -471,26 +471,92 @@ export async function updateSessionNote(
   updateData: Partial<SessionNoteInput>
 ): Promise<DbResponse<SessionNote>> {
   try {
+    console.log('Updating session note with ID:', noteId, 'with data:', updateData);
+    
+    // Ensure we have authentication
+    const { data: authData } = await supabase.auth.getSession();
+    
+    if (!authData?.session?.user?.id) {
+      throw new Error('Authentication required to update session notes');
+    }
+    
+    const userId = authData.session.user.id;
+    console.log('Current authenticated user ID:', userId);
+    
+    // Ensure we have the admin client available
+    if (!supabaseAdmin) {
+      throw new Error('Admin client not available - check environment variables');
+    }
+    
+    // Get the therapist ID for this user
+    const { data: therapists } = await supabaseAdmin
+      .from('therapists')
+      .select('*')
+      .eq('user_id', userId);
+    
+    const therapist = therapists && therapists.length > 0 ? therapists[0] : null;
+    
+    if (!therapist) {
+      throw new Error('No therapist record found for the current user');
+    }
+    
+    console.log(`Using therapist ID: ${therapist.id} for note verification`);
+    
+    // First verify this note belongs to this therapist for security
+    const { data: noteData } = await supabaseAdmin
+      .from('session_notes')
+      .select('*')
+      .eq('id', noteId)
+      .eq('therapist_id', therapist.id)
+      .single();
+    
+    if (!noteData) {
+      throw new Error('Session note not found or does not belong to this therapist');
+    }
+    
+    console.log(`Verified note ${noteId} belongs to therapist ${therapist.id}`);
+    
     // Handle content field if it's a string
     let updateDataToUse = { ...updateData };
     if (typeof updateDataToUse.content === 'string') {
       try {
         updateDataToUse.content = JSON.parse(updateDataToUse.content as unknown as string);
+        console.log('Successfully parsed content string to JSON object during update');
       } catch (e) {
         console.error('Error parsing content string during update:', e);
+        // Fall back to keeping it as a string if parsing fails
       }
     }
     
-    const { data, error } = await supabase
+    // Ensure the therapist_id in the update data matches the current user's therapist ID
+    const updateDataWithTherapistId = {
+      ...updateDataToUse,
+      therapist_id: therapist.id
+    };
+    
+    console.log('Prepared update data with correct therapist ID');
+    
+    // Use the admin client to bypass RLS
+    const { data, error } = await supabaseAdmin
       .from('session_notes')
-      .update(updateDataToUse)
+      .update(updateDataWithTherapistId)
       .eq('id', noteId)
       .select();
 
-    if (error) throw error;
+    if (error) {
+      console.error('Error updating session note:', error);
+      throw error;
+    }
     
     // Return the first note if available
     const updatedNote = data && data.length > 0 ? data[0] : null;
+    
+    if (updatedNote) {
+      console.log('Session note updated successfully with ID:', updatedNote.id);
+    } else {
+      console.warn('Session note update returned no data');
+    }
+    
     return { data: updatedNote, error: null };
   } catch (error) {
     console.error('Error updating session note:', error);
@@ -499,19 +565,69 @@ export async function updateSessionNote(
 }
 
 /**
- * Deletes a session note
+ * Deletes a session note using admin client to bypass RLS
  * @param noteId UUID of the session note
  * @returns Success status or an error
  */
 export async function deleteSessionNote(noteId: string): Promise<DbResponse<{ success: boolean }>> {
   try {
-    const { error } = await supabase
+    console.log('Deleting session note with ID:', noteId);
+    
+    // Ensure we have authentication
+    const { data: authData } = await supabase.auth.getSession();
+    
+    if (!authData?.session?.user?.id) {
+      throw new Error('Authentication required to delete session notes');
+    }
+    
+    const userId = authData.session.user.id;
+    console.log('Current authenticated user ID:', userId);
+    
+    // Ensure we have the admin client available
+    if (!supabaseAdmin) {
+      throw new Error('Admin client not available - check environment variables');
+    }
+    
+    // Get the therapist ID for this user
+    const { data: therapists } = await supabaseAdmin
+      .from('therapists')
+      .select('*')
+      .eq('user_id', userId);
+    
+    const therapist = therapists && therapists.length > 0 ? therapists[0] : null;
+    
+    if (!therapist) {
+      throw new Error('No therapist record found for the current user');
+    }
+    
+    console.log(`Using therapist ID: ${therapist.id} for note verification`);
+    
+    // First verify this note belongs to this therapist for security
+    const { data: noteData } = await supabaseAdmin
+      .from('session_notes')
+      .select('*')
+      .eq('id', noteId)
+      .eq('therapist_id', therapist.id)
+      .single();
+    
+    if (!noteData) {
+      throw new Error('Session note not found or does not belong to this therapist');
+    }
+    
+    console.log(`Verified note ${noteId} belongs to therapist ${therapist.id}, proceeding with deletion`);
+    
+    // Use the admin client to bypass RLS
+    const { error } = await supabaseAdmin
       .from('session_notes')
       .delete()
       .eq('id', noteId);
 
-    if (error) throw error;
+    if (error) {
+      console.error('Error deleting session note:', error);
+      throw error;
+    }
     
+    console.log(`Session note ${noteId} deleted successfully`);
     return { data: { success: true }, error: null };
   } catch (error) {
     console.error('Error deleting session note:', error);

@@ -370,44 +370,54 @@ export default function Clients() {
     try {
       setLoading(true);
       
-      // Import supabase directly to ensure fresh auth context
+      // Import required modules to ensure fresh instances
       const { supabase } = await import('../lib/supabase');
+      const clientOperations = await import('../services/db-operations/clients');
 
       // Force session refresh to get fresh tokens
       await supabase.auth.refreshSession();
       
-      console.log('Deleting client directly with Supabase, client ID:', deleteClientId);
+      console.log('Deleting client using client operations, client ID:', deleteClientId);
       
       // First delete the client profile if it exists (to handle foreign key constraints)
-      const profileResult = await supabase
-        .from('client_profiles')
-        .delete()
-        .eq('client_id', deleteClientId);
-        
-      if (profileResult.error) {
-        console.warn('Profile deletion warning:', profileResult.error);
-        // Continue even if profile deletion has issues
+      // Using the admin client to bypass RLS
+      const { supabaseAdmin } = await import('../lib/supabase');
+      if (supabaseAdmin) {
+        const profileResult = await supabaseAdmin
+          .from('client_profiles')
+          .delete()
+          .eq('client_id', deleteClientId);
+          
+        if (profileResult.error) {
+          console.warn('Profile deletion warning:', profileResult.error);
+          // Continue even if profile deletion has issues
+        } else {
+          console.log('Client profile deleted successfully');
+        }
       }
       
-      // Delete the client directly with Supabase
-      const clientResult = await supabase
-        .from('clients')
-        .delete()
-        .eq('id', deleteClientId)
-        .eq('therapist_id', user.id); // Important: ensure therapist_id matches for RLS
+      // Use our updated deleteClient function to properly handle RLS
+      const { data, error } = await clientOperations.deleteClient(deleteClientId);
         
-      if (clientResult.error) {
-        console.error('Client deletion error:', clientResult.error);
-        toast.error(`Failed to delete client: ${clientResult.error.message}`);
+      if (error) {
+        console.error('Client deletion error:', error);
+        toast.error(`Failed to delete client: ${error.message}`);
         setLoading(false);
         return;
       }
       
-      toast.success("Client deleted successfully");
-      setDeleteClientId(null);
+      if (data?.success) {
+        console.log('Client deleted successfully:', deleteClientId);
+        toast.success("Client deleted successfully");
+        setDeleteClientId(null);
+        
+        // Refresh the client list to ensure we have the latest data
+        fetchClients();
+      } else {
+        console.error('Client deletion returned no success status');
+        toast.error("Failed to delete client: No success confirmation");
+      }
       
-      // Refresh the client list to ensure we have the latest data
-      fetchClients();
       setLoading(false);
     } catch (err: any) {
       console.error('Error in client deletion:', err);

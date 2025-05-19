@@ -16,9 +16,10 @@ function getPreview(text: string, maxLength = 80) {
 interface NotesGridProps {
   notes: ClinicalNote[];
   onDeleteNote?: (noteId: string) => void;
+  onEditNote?: (noteId: string, updatedNote: Partial<ClinicalNote>) => Promise<boolean>;
 }
 
-const NotesGrid = ({ notes, onDeleteNote }: NotesGridProps) => {
+const NotesGrid = ({ notes, onDeleteNote, onEditNote }: NotesGridProps) => {
   const [selectedNote, setSelectedNote] = useState<any | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
@@ -81,13 +82,51 @@ const NotesGrid = ({ notes, onDeleteNote }: NotesGridProps) => {
     setEditForm((prev: any) => ({ ...prev, [name]: value }));
   };
 
-  const handleEditSave = () => {
+  const handleEditSave = async () => {
     if (noteToEdit) {
-      noteToEdit.title = editForm.title;
-      noteToEdit.date = editForm.date;
-      noteToEdit.therapyType = editForm.therapyType;
-      noteToEdit.tags = editForm.tags.split(",").map((t: string) => t.trim()).filter(Boolean);
-      noteToEdit.content.insights = editForm.content.split("\n").filter(Boolean);
+      try {
+        // Prepare the updated note data
+        const updatedNoteData = {
+          title: editForm.title,
+          date: editForm.date,
+          therapyType: editForm.therapyType,
+          tags: editForm.tags.split(",").map((t: string) => t.trim()).filter(Boolean),
+          content: {
+            ...noteToEdit.content,
+            insights: editForm.content.split("\n").filter(Boolean)
+          }
+        };
+        
+        // If an external edit handler is provided, use it to persist changes to the database
+        if (onEditNote) {
+          console.log('Saving note changes to database:', updatedNoteData);
+          const success = await onEditNote(noteToEdit.id, updatedNoteData);
+          
+          if (success) {
+            console.log('Note updated successfully in database');
+            // Update the local note with the new data
+            noteToEdit.title = updatedNoteData.title;
+            noteToEdit.date = updatedNoteData.date;
+            noteToEdit.therapyType = updatedNoteData.therapyType;
+            noteToEdit.tags = updatedNoteData.tags;
+            noteToEdit.content = updatedNoteData.content;
+          } else {
+            console.error('Failed to update note in database');
+            alert('Failed to save changes. Please try again.');
+          }
+        } else {
+          // Just update the UI if no external handler (for backwards compatibility)
+          console.log('No external handler provided, updating note in UI only (changes will not persist)');
+          noteToEdit.title = updatedNoteData.title;
+          noteToEdit.date = updatedNoteData.date;
+          noteToEdit.therapyType = updatedNoteData.therapyType;
+          noteToEdit.tags = updatedNoteData.tags;
+          noteToEdit.content = updatedNoteData.content;
+        }
+      } catch (error) {
+        console.error('Error updating note:', error);
+        alert('An error occurred while saving changes. Please try again.');
+      }
     }
     setEditDialogOpen(false);
     setNoteToEdit(null);

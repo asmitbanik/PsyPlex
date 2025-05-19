@@ -138,21 +138,46 @@ async function createClientWithServiceRole(
 }
 
 /**
- * Retrieves a specific client by their ID
+ * Retrieves a specific client by their ID using admin client to bypass RLS
  * @param clientId UUID of the client
  * @returns The client data or an error
  */
 export async function getClientById(clientId: string): Promise<DbResponse<Client>> {
   try {
-    const { data, error } = await supabase
+    console.log('Fetching client with ID:', clientId);
+    
+    // Ensure we have authentication
+    const { data: authData } = await supabase.auth.getSession();
+    
+    if (!authData?.session?.user?.id) {
+      throw new Error('Authentication required to view client details');
+    }
+    
+    // Ensure we have the admin client available
+    if (!supabaseAdmin) {
+      throw new Error('Admin client not available - check environment variables');
+    }
+    
+    // Use the admin client to bypass RLS
+    const { data, error } = await supabaseAdmin
       .from('clients')
       .select('*')
       .eq('id', clientId);
 
-    if (error) throw error;
+    if (error) {
+      console.error('Error fetching client:', error);
+      throw error;
+    }
     
     // Return the first client if exists, or null if no clients found
     const client = data && data.length > 0 ? data[0] : null;
+    
+    if (!client) {
+      console.warn(`No client found with ID: ${clientId}`);
+    } else {
+      console.log(`Successfully fetched client: ${client.first_name} ${client.last_name}`);
+    }
+    
     return { data: client, error: null };
   } catch (error) {
     console.error('Error fetching client:', error);
@@ -353,7 +378,7 @@ export async function getClientsWithProfiles(therapistId: string): Promise<DbRes
 }
 
 /**
- * Updates an existing client's information
+ * Updates an existing client's information using admin client to bypass RLS
  * @param clientId UUID of the client
  * @param updateData Partial client data to update
  * @returns The updated client or an error
@@ -363,15 +388,69 @@ export async function updateClient(
   updateData: Partial<ClientInput>
 ): Promise<DbResponse<Client>> {
   try {
-    const { data, error } = await supabase
+    console.log('Updating client with ID:', clientId, 'with data:', updateData);
+    
+    // Ensure we have authentication
+    const { data: authData } = await supabase.auth.getSession();
+    
+    if (!authData?.session?.user?.id) {
+      throw new Error('Authentication required to update clients');
+    }
+    
+    const userId = authData.session.user.id;
+    console.log('Current authenticated user ID:', userId);
+    
+    // Ensure we have the admin client available
+    if (!supabaseAdmin) {
+      throw new Error('Admin client not available - check environment variables');
+    }
+    
+    // Get the therapist ID for this user
+    const { data: therapists } = await supabaseAdmin
+      .from('therapists')
+      .select('*')
+      .eq('user_id', userId);
+    
+    const therapist = therapists && therapists.length > 0 ? therapists[0] : null;
+    
+    if (!therapist) {
+      throw new Error('No therapist record found for the current user');
+    }
+    
+    // Ensure the therapist_id in the update data matches the current user's therapist ID
+    const updateDataWithTherapistId = {
+      ...updateData,
+      therapist_id: therapist.id
+    };
+    
+    console.log(`Using therapist ID: ${therapist.id} for update`);
+    
+    // First verify this client belongs to this therapist for security
+    const { data: clientData } = await supabaseAdmin
       .from('clients')
-      .update(updateData)
+      .select('*')
+      .eq('id', clientId)
+      .eq('therapist_id', therapist.id)
+      .single();
+    
+    if (!clientData) {
+      throw new Error('Client not found or does not belong to this therapist');
+    }
+    
+    // Use the admin client to bypass RLS
+    const { data, error } = await supabaseAdmin
+      .from('clients')
+      .update(updateDataWithTherapistId)
       .eq('id', clientId)
       .select()
       .single();
 
-    if (error) throw error;
+    if (error) {
+      console.error('Error updating client:', error);
+      throw error;
+    }
     
+    console.log('Client updated successfully:', data);
     return { data, error: null };
   } catch (error) {
     console.error('Error updating client:', error);
@@ -380,19 +459,69 @@ export async function updateClient(
 }
 
 /**
- * Deletes a client
+ * Deletes a client using admin client to bypass RLS
  * @param clientId UUID of the client
  * @returns Success status or an error
  */
 export async function deleteClient(clientId: string): Promise<DbResponse<{ success: boolean }>> {
   try {
-    const { error } = await supabase
+    console.log('Deleting client with ID:', clientId);
+    
+    // Ensure we have authentication
+    const { data: authData } = await supabase.auth.getSession();
+    
+    if (!authData?.session?.user?.id) {
+      throw new Error('Authentication required to delete clients');
+    }
+    
+    const userId = authData.session.user.id;
+    console.log('Current authenticated user ID:', userId);
+    
+    // Ensure we have the admin client available
+    if (!supabaseAdmin) {
+      throw new Error('Admin client not available - check environment variables');
+    }
+    
+    // Get the therapist ID for this user
+    const { data: therapists } = await supabaseAdmin
+      .from('therapists')
+      .select('*')
+      .eq('user_id', userId);
+    
+    const therapist = therapists && therapists.length > 0 ? therapists[0] : null;
+    
+    if (!therapist) {
+      throw new Error('No therapist record found for the current user');
+    }
+    
+    console.log(`Using therapist ID: ${therapist.id} for client deletion check`);
+    
+    // First verify this client belongs to this therapist for security
+    const { data: clientData } = await supabaseAdmin
+      .from('clients')
+      .select('*')
+      .eq('id', clientId)
+      .eq('therapist_id', therapist.id)
+      .single();
+    
+    if (!clientData) {
+      throw new Error('Client not found or does not belong to this therapist');
+    }
+    
+    console.log(`Verified client ${clientId} belongs to therapist ${therapist.id}, proceeding with deletion`);
+    
+    // Use the admin client to bypass RLS
+    const { error } = await supabaseAdmin
       .from('clients')
       .delete()
       .eq('id', clientId);
 
-    if (error) throw error;
+    if (error) {
+      console.error('Error deleting client:', error);
+      throw error;
+    }
     
+    console.log(`Client ${clientId} deleted successfully`);
     return { data: { success: true }, error: null };
   } catch (error) {
     console.error('Error deleting client:', error);

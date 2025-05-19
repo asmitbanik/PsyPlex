@@ -1,13 +1,9 @@
-import { useEffect, useState, useCallback } from "react";
-import { Link, useNavigate } from "react-router-dom";
-import { Users, CalendarCheck, BrainCircuit, LineChart, FileText, Plus, Eye, Play, RefreshCw, Loader2 } from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import { Users, CalendarCheck, BrainCircuit, LineChart, Plus, Eye, Play, RefreshCw } from "lucide-react";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { useAuth } from "@/contexts/AuthContext";
-import { ClientService, ClientWithProfile } from "@/services/ClientService";
-import { SessionService, SessionWithDetails } from "@/services/SessionService";
-import { toast } from "sonner";
 
 // Dashboard specific interfaces
 interface DashboardClient {
@@ -25,132 +21,46 @@ interface DashboardSession {
   type: "In-person" | "Virtual";
 }
 
+// Mock data for dashboard
+const MOCK_CLIENTS: DashboardClient[] = [
+  { id: '1', name: 'John Doe', progress: 75, lastSession: '05/15/2025' },
+  { id: '2', name: 'Jane Smith', progress: 45, lastSession: '05/17/2025' },
+  { id: '3', name: 'Robert Johnson', progress: 90, lastSession: '05/10/2025' },
+  { id: '4', name: 'Emily Wilson', progress: 60, lastSession: '05/12/2025' }
+];
+
+const MOCK_SESSIONS: DashboardSession[] = [
+  { id: '1', clientName: 'John Doe', date: '05/20/2025', time: '10:00 AM', type: 'Virtual' },
+  { id: '2', clientName: 'Jane Smith', date: '05/21/2025', time: '2:30 PM', type: 'In-person' },
+  { id: '3', clientName: 'Robert Johnson', date: '05/22/2025', time: '1:15 PM', type: 'Virtual' },
+  { id: '4', clientName: 'Emily Wilson', date: '05/23/2025', time: '11:00 AM', type: 'In-person' }
+];
+
 const Dashboard = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
-  const clientService = new ClientService();
-  const sessionService = new SessionService();
   
-  // Use an identifier to track component mount state
-  const [mountId] = useState(Math.random().toString(36).substring(7));
+  // Using static mock data instead of fetching from Supabase
+  const recentClients = MOCK_CLIENTS;
+  const upcomingSessions = MOCK_SESSIONS;
+  const counts = {
+    clients: 16,
+    sessions: 24
+  };
 
-  const [recentClients, setRecentClients] = useState<DashboardClient[]>([]);
-  const [upcomingSessions, setUpcomingSessions] = useState<DashboardSession[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [counts, setCounts] = useState({
-    clients: 0,
-    sessions: 0
-  });
-  
-  // Helper function to generate consistent progress value based on client ID
-  const getClientProgress = useCallback((clientId: string) => {
-    // Generate a stable progress value based on the client ID
-    // This ensures the same client always gets the same progress value
-    let hash = 0;
-    for (let i = 0; i < clientId.length; i++) {
-      hash = ((hash << 5) - hash) + clientId.charCodeAt(i);
-      hash |= 0; // Convert to 32bit integer
-    }
-    // Generate a number between 10 and 90 for better visual distribution
-    return Math.abs(hash % 81) + 10;
-  }, []);
-  
-  // Define fetchDashboardData as a callback to prevent recreation on renders
-  const fetchDashboardData = useCallback(async () => {
-    if (!user?.id) return;
-    
-    try {
-      setLoading(true);
-      
-      // Fetch clients
-      const { data: clientsData, error: clientsError } = await clientService.getClientsWithProfiles(user.id);
-      
-      if (clientsError) {
-        setError(clientsError.message);
-        toast.error("Failed to load clients");
-        return;
-      }
-      
-      // Get recent clients with stable progress values
-      const recentClientData = clientsData?.slice(0, 4).map(client => ({
-        id: client.id,
-        name: (client.profile ? `${client.profile.first_name || ''} ${client.profile.last_name || ''}` : `${client.first_name || ''} ${client.last_name || ''}`).trim() || 'Client',
-        progress: getClientProgress(client.id), // Use consistent progress based on client ID
-        lastSession: new Date(client.updated_at || client.created_at || Date.now()).toLocaleDateString()
-      })) || [];
-      
-      setRecentClients(recentClientData);
-      
-      // Fetch upcoming sessions
-      const { data: sessionsData, error: sessionsError } = await sessionService.getSessionsByTherapist(user.id);
-      
-      if (sessionsError) {
-        setError(sessionsError.message);
-        toast.error("Failed to load sessions");
-        return;
-      }
-      
-      // Format upcoming sessions
-      const upcomingSessionData = sessionsData
-        ?.filter(session => session.status === 'Scheduled')
-        .slice(0, 4)
-        .map(session => ({
-          id: session.id,
-          clientName: session.client ? `${session.client.first_name} ${session.client.last_name}` : 'Unknown Client',
-          date: new Date(session.session_date).toLocaleDateString(),
-          time: new Date(session.session_date).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}),
-          type: session.session_type
-        })) || [];
-      
-      setUpcomingSessions(upcomingSessionData);
-      
-      // Set counts
-      setCounts({
-        clients: clientsData?.length || 0,
-        sessions: sessionsData?.length || 0
-      });
-      
-    } catch (err: any) {
-      setError(err.message);
-      toast.error("An error occurred while loading dashboard data");
-    } finally {
-      setLoading(false);
-    }
-  }, [user?.id, clientService, sessionService]);
-
-  // Fetch dashboard data from Supabase when component mounts
-  useEffect(() => {
-    console.log(`Dashboard mounted with ID: ${mountId}`);
-    // Set loading state immediately
-    setLoading(true);
-    
-    // Use setTimeout to ensure loading state is visible for a minimum time
-    // This prevents the loading symbol from flickering
-    const loadingTimer = setTimeout(() => {
-      fetchDashboardData();
-    }, 300); // Short delay to ensure consistent loading experience
-    
-    // Clean up when component unmounts
-    return () => {
-      clearTimeout(loadingTimer);
-      console.log(`Dashboard unmounting ID: ${mountId}`);
-    };
-  }, [fetchDashboardData, mountId]);
-
-  // Memoize metrics to prevent re-creation on every render
-  const metrics = useCallback(() => [
+  // Static metrics data
+  const metrics = [
     {
       title: "Clients",
       icon: <Users className="h-7 w-7" />, 
-      value: loading ? "..." : counts.clients.toString(), 
+      value: counts.clients.toString(), 
       background: "bg-therapy-blue/10", 
       iconColor: "text-therapy-blue"
     },
     {
       title: "Sessions",
       icon: <CalendarCheck className="h-7 w-7" />, 
-      value: loading ? "..." : counts.sessions.toString(), 
+      value: counts.sessions.toString(), 
       background: "bg-therapy-purple/10", 
       iconColor: "text-therapy-purple"
     },
@@ -169,7 +79,7 @@ const Dashboard = () => {
       background: "bg-therapy-yellow/10", 
       iconColor: "text-therapy-yellow"
     }
-  ], [loading, counts.clients, counts.sessions]);
+  ];
 
   return (
     <div className="space-y-8">
@@ -189,24 +99,12 @@ const Dashboard = () => {
         </div>
       </div>
 
-      {loading && (
-        <div className="flex justify-center p-12">
-          <Loader2 className="h-12 w-12 text-therapy-purple animate-spin" />
-        </div>
-      )}
-
-      {error && !loading && (
-        <Card className="border-red-300 bg-red-50">
-          <CardContent className="pt-6">
-            <p className="text-red-600">{error}</p>
-          </CardContent>
-        </Card>
-      )}
+      {/* Loading state and error handling removed */}
 
       {/* Metrics Cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        {/* Use memoized metrics with function call */}
-        {metrics().map((metric, index) => (
+        {/* Static metrics data */}
+        {metrics.map((metric, index) => (
           <Card key={index} className="shadow-sm border border-gray-200">
             <CardContent className="pt-6">
               <div className="flex items-center justify-between">

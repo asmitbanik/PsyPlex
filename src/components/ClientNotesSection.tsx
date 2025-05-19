@@ -12,6 +12,7 @@ interface ClientNotesSectionProps {
   }[];
   searchQuery?: string;
   onDeleteNote?: (noteId: string) => void;
+  onEditNote?: (noteId: string, updatedNote: Partial<any>) => Promise<boolean>;
 }
 
 function getInitials(name: string) {
@@ -22,7 +23,7 @@ function getInitials(name: string) {
     .toUpperCase();
 }
 
-const ClientNotesSection = ({ clients, searchQuery = "", onDeleteNote }: ClientNotesSectionProps) => {
+const ClientNotesSection = ({ clients, searchQuery = "", onDeleteNote, onEditNote }: ClientNotesSectionProps) => {
   const [openClients, setOpenClients] = useState<Record<string, boolean>>(
     clients.reduce((acc, client) => ({ ...acc, [client.id]: true }), {})
   );
@@ -78,7 +79,7 @@ const ClientNotesSection = ({ clients, searchQuery = "", onDeleteNote }: ClientN
             >
               <div className="p-4 pt-0">
                 {filteredNotes.length > 0 ? (
-                  <NotesGrid notes={filteredNotes} onDeleteNote={onDeleteNote} />
+                  <NotesGrid notes={filteredNotes} onDeleteNote={onDeleteNote} onEditNote={onEditNote} />
                 ) : (
                   <div className="flex flex-col items-center justify-center py-8 text-center">
                     <User className="w-10 h-10 mb-3 text-therapy-blue/40" />
