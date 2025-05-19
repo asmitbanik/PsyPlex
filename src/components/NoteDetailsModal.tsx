@@ -32,13 +32,14 @@ const NoteDetailsModal = ({ open, onClose, note, onEdit, onDelete }: NoteDetails
             ))}
           </div>
         )}
-        <DialogDescription className="text-base text-gray-700 whitespace-pre-line leading-relaxed mb-4">
+        {/* Remove DialogDescription component to fix DOM nesting warning */}
+        <div className="text-base text-gray-700 whitespace-pre-line leading-relaxed mb-4">
           {note.content && note.content.insights && Array.isArray(note.content.insights)
             ? note.content.insights.map((line: string, idx: number) => (
-                <div key={idx} className="mb-2">{line}</div>
+                <p key={idx} className="mb-2">{line}</p>
               ))
             : null}
-        </DialogDescription>
+        </div>
         <div className="flex justify-end gap-2 mt-4">
           {onEdit && (
             <button

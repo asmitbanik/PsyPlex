@@ -1,4 +1,4 @@
-interface ProfileData {
+export interface ProfileData {
   profilePicture?: string;
   fullName: string;
   email: string;

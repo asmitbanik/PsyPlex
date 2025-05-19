@@ -19,7 +19,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { useAuth } from "@/contexts/AuthContext";
-import { useState, useRef } from "react";
+import { useState, useRef, useCallback, useEffect, memo } from "react";
 import { toast } from "@/hooks/use-toast";
 import {
   Settings,
@@ -36,6 +36,7 @@ import {
   X,
 } from "lucide-react";
 import { profileService } from "@/services/profileService";
+import type { ProfileData } from "@/services/profileService";
 import {
   Form,
   FormControl,
@@ -64,15 +65,27 @@ const profileSchema = z.object({
   bio: z.string().optional(),
 });
 
-type ProfileData = z.infer<typeof profileSchema>;
+// Define zod schema based on ProfileData from profileService
+type FormValues = z.infer<typeof profileSchema>;
 
-export function ProfileMenu() {
+// Use memo to prevent unnecessary re-renders
+export const ProfileMenu = memo(function ProfileMenu() {
   const { signOut, user } = useAuth();
   const [isSigningOut, setIsSigningOut] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   
-  // Handle logout functionality
-  const handleLogout = async () => {
+  // Add a unique instance ID to prevent stale closures
+  const [instanceId] = useState(() => Math.random().toString(36).substring(7));
+  
+  useEffect(() => {
+    console.log(`ProfileMenu mounted with ID: ${instanceId}`);
+    return () => {
+      console.log(`ProfileMenu unmounting ID: ${instanceId}`);
+    };
+  }, [instanceId]);
+  
+  // Handle logout functionality using useCallback to prevent recreation
+  const handleLogout = useCallback(async () => {
     try {
       setIsSigningOut(true);
       await signOut();
@@ -82,9 +95,13 @@ export function ProfileMenu() {
     } finally {
       setIsSigningOut(false);
     }
-  };
+  }, [signOut]);
   
-  const form = useForm<ProfileData>({
+  // Use state to track when profile data needs to be refreshed
+  const [profileRefreshKey, setProfileRefreshKey] = useState(0);
+  
+  // Initialize form with profile data
+  const form = useForm<FormValues>({
     resolver: zodResolver(profileSchema),
     defaultValues: (() => {
       // Handle the profileData to ensure all required fields are present
@@ -105,21 +122,44 @@ export function ProfileMenu() {
       };
     })()
   });
+  
+  // Reset form when profile data is updated
+  useEffect(() => {
+    const savedProfile = profileService.getProfile();
+    const defaultProfile = profileService.getInitialProfile();
+    
+    if (savedProfile) {
+      // Ensure all required fields have non-null values to satisfy TypeScript
+      const resetData: FormValues = {
+        profilePicture: savedProfile.profilePicture || defaultProfile.profilePicture,
+        fullName: savedProfile.fullName || defaultProfile.fullName || 'Anonymous User',
+        email: savedProfile.email || defaultProfile.email || 'anonymous@example.com',
+        phone: savedProfile.phone || defaultProfile.phone || '0000000000',
+        specialization: savedProfile.specialization || defaultProfile.specialization || 'General',
+        languages: savedProfile.languages || defaultProfile.languages || 'English',
+        bio: savedProfile.bio || defaultProfile.bio || ''
+      };
+      form.reset(resetData);
+    }
+  }, [profileRefreshKey, form]);
 
-  const handleSave = (data: ProfileData) => {
+  const handleSave = useCallback((data: FormValues) => {
     try {
       // Ensure all required fields are present before updating
       const validProfileData: ProfileData = {
         profilePicture: data.profilePicture,
-        fullName: data.fullName || 'Anonymous User',
-        email: data.email || 'anonymous@example.com',
-        phone: data.phone || '0000000000',
-        specialization: data.specialization || 'General',
-        languages: data.languages || 'English',
-        bio: data.bio
+        fullName: data.fullName, // Already required by schema
+        email: data.email, // Already required by schema
+        phone: data.phone, // Already required by schema
+        specialization: data.specialization, // Already required by schema
+        languages: data.languages, // Already required by schema
+        bio: data.bio || ''
       };
       
       profileService.updateProfile(validProfileData);
+      // Trigger profile data refresh
+      setProfileRefreshKey(prevKey => prevKey + 1);
+      
       toast({
         title: "Profile Updated",
         description: "Your profile has been successfully updated.",
@@ -131,27 +171,27 @@ export function ProfileMenu() {
         variant: "destructive",
       });
     }
-  };
+  }, []);
 
-  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileChange = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file) {
       const reader = new FileReader();
-      reader.onload = (e) => {
+      reader.onload = function(e) {
         const result = e.target?.result as string;
-        form.setValue("profilePicture", result);
+        form.setValue('profilePicture', result);
       };
       reader.readAsDataURL(file);
     }
-  };
+  }, [form]);
 
-  const triggerFileInput = () => {
+  const triggerFileInput = useCallback(() => {
     fileInputRef.current?.click();
-  };
+  }, []);
 
-  const getInitials = (name: string) => {
-    return name.split(' ').map(part => part[0]).join('');
-  };
+  const getInitials = useCallback((name: string) => {
+    return name?.split(' ').map(n => n[0]).join('') || 'U';
+  }, []);
 
   return (
     <>
@@ -401,6 +441,10 @@ export function ProfileMenu() {
                       <Button 
                         type="button" 
                         variant="outline"
+                        onClick={(e) => {
+                          // Prevent event bubbling
+                          e.stopPropagation();
+                        }}
                       >
                         Cancel
                       </Button>
@@ -414,4 +458,4 @@ export function ProfileMenu() {
       </Dialog>
     </>
   );
-}
+});
